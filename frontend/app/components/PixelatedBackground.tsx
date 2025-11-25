@@ -126,7 +126,17 @@ export default function PixelatedBackground({ imageUrl, pixelSize = 15 }: Pixela
 
   if (!imageUrl) {
     return (
-      <div className="fixed inset-0 bg-gradient-to-br from-purple-900 via-blue-900 to-black" />
+      <div 
+        className="fixed inset-0 bg-gradient-to-br from-purple-900 via-blue-900 to-black z-0" 
+        style={{
+          width: '100vw',
+          height: '100vh',
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          zIndex: 0,
+        }}
+      />
     )
   }
 
@@ -147,19 +157,17 @@ export default function PixelatedBackground({ imageUrl, pixelSize = 15 }: Pixela
 
   return (
     <div 
-      className="fixed inset-0 bg-black z-0 pointer-events-none" 
+      className="fixed inset-0 bg-black pointer-events-none" 
       style={{ 
         width: '100vw',
         height: '100vh',
+        position: 'fixed',
         top: 0,
         left: 0,
-        right: 0,
-        bottom: 0,
         zIndex: 0,
       }}
     >
       <div 
-        className="absolute inset-0"
         style={{
           display: 'grid',
           gridTemplateColumns: `repeat(${columns}, ${pixelSize}px)`,
@@ -167,7 +175,7 @@ export default function PixelatedBackground({ imageUrl, pixelSize = 15 }: Pixela
           gap: '0',
           width: '100vw',
           height: '100vh',
-          position: 'fixed',
+          position: 'absolute',
           top: 0,
           left: 0,
         }}
