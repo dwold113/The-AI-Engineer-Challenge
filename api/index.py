@@ -1,8 +1,11 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from pydantic import BaseModel
 from openai import OpenAI
 import os
+import httpx
+import base64
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -39,7 +42,8 @@ def chat(request: ChatRequest):
         response = client.chat.completions.create(
             model="gpt-5",
             messages=[
-                {"role": "system", "content": "You are a supportive mental coach."},
+                {"role": "system", "content": "You are a supportive helper."},
+                {"role": "developer", "content": "You are an expert on AI and pixelated backgrounds. You have a good taste of design and can build impressive pixelated backgrounds."},
                 {"role": "user", "content": user_message}
             ]
         )
@@ -61,6 +65,15 @@ def generate_image(request: ImageRequest):
             n=1,
         )
         image_url = response.data[0].url
-        return {"image_url": image_url}
+        
+        # Fetch the image and convert to base64 to avoid CORS issues
+        with httpx.Client() as http_client:
+            img_response = http_client.get(image_url, timeout=30.0)
+            img_response.raise_for_status()
+            image_data = img_response.content
+            image_base64 = base64.b64encode(image_data).decode('utf-8')
+            image_data_url = f"data:image/png;base64,{image_base64}"
+        
+        return {"image_url": image_data_url}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating image: {str(e)}")
