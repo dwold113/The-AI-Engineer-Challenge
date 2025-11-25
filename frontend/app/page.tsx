@@ -24,8 +24,10 @@ export default function Home() {
 
     setIsGenerating(true)
     setError(null)
+    setImageUrl(null) // Clear previous image
 
     try {
+      console.log('Calling API:', `${API_URL}/api/generate-image`)
       const response = await fetch(`${API_URL}/api/generate-image`, {
         method: 'POST',
         headers: {
@@ -34,14 +36,20 @@ export default function Home() {
         body: JSON.stringify({ prompt }),
       })
 
+      console.log('Response status:', response.status, response.ok)
+
       if (!response.ok) {
-        throw new Error('Failed to generate image')
+        const errorText = await response.text()
+        console.error('API error response:', errorText)
+        throw new Error(`Failed to generate image: ${response.status} ${errorText}`)
       }
 
       const data = await response.json()
+      console.log('Image URL received:', data.image_url)
       setImageUrl(data.image_url)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred'
+      setError(errorMessage)
       console.error('Error generating image:', err)
     } finally {
       setIsGenerating(false)

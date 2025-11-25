@@ -29,30 +29,26 @@ export default function PixelatedBackground({ imageUrl, pixelSize = 15 }: Pixela
   }, [])
 
   useEffect(() => {
-    if (!imageUrl || dimensions.width === 0 || dimensions.height === 0) {
+    if (!imageUrl || dimensions.width === 0 || dimensions.height === 0 || !mounted) {
       setPixels([])
       return
     }
 
     setIsLoading(true)
-    const img = new Image()
     
-    // Try to load with CORS, but handle errors gracefully
-    img.crossOrigin = 'anonymous'
-    
-    img.onload = () => {
-      console.log('Image loaded successfully', img.width, img.height)
+    const processImage = (image: HTMLImageElement) => {
+      console.log('Processing image:', image.width, image.height)
       const canvas = document.createElement('canvas')
       const ctx = canvas.getContext('2d', { willReadFrequently: true })
       if (!ctx) {
+        console.error('Failed to get canvas context')
         setIsLoading(false)
         return
       }
 
-      // Calculate dimensions to cover entire viewport (fill screen completely)
       const screenWidth = dimensions.width
       const screenHeight = dimensions.height
-      const imgAspect = img.width / img.height
+      const imgAspect = image.width / image.height
       const screenAspect = screenWidth / screenHeight
 
       let drawWidth = screenWidth
@@ -60,14 +56,12 @@ export default function PixelatedBackground({ imageUrl, pixelSize = 15 }: Pixela
       let offsetX = 0
       let offsetY = 0
 
-      // Cover mode: scale image to cover entire screen, cropping if necessary
+      // Cover mode: scale image to cover entire screen
       if (imgAspect > screenAspect) {
-        // Image is wider - scale to cover height, crop width
         drawHeight = screenHeight
         drawWidth = drawHeight * imgAspect
         offsetX = (screenWidth - drawWidth) / 2
       } else {
-        // Image is taller - scale to cover width, crop height
         drawWidth = screenWidth
         drawHeight = drawWidth / imgAspect
         offsetY = (screenHeight - drawHeight) / 2
@@ -79,9 +73,9 @@ export default function PixelatedBackground({ imageUrl, pixelSize = 15 }: Pixela
       // Fill background with black
       ctx.fillStyle = '#000000'
       ctx.fillRect(0, 0, canvas.width, canvas.height)
-
-      // Draw image to cover entire screen (may crop edges)
-      ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight)
+      
+      // Draw image to cover entire screen
+      ctx.drawImage(image, offsetX, offsetY, drawWidth, drawHeight)
 
       // Extract pixel data
       const pixelData: Array<{ x: number; y: number; color: string }> = []
@@ -91,7 +85,6 @@ export default function PixelatedBackground({ imageUrl, pixelSize = 15 }: Pixela
           const imageData = ctx.getImageData(x, y, pixelSize, pixelSize)
           const data = imageData.data
           
-          // Calculate average color of the pixel block
           let r = 0, g = 0, b = 0, count = 0
           for (let i = 0; i < data.length; i += 4) {
             r += data[i]
@@ -117,20 +110,28 @@ export default function PixelatedBackground({ imageUrl, pixelSize = 15 }: Pixela
       setIsLoading(false)
     }
 
+    const img = new Image()
+    
+    img.onload = () => {
+      console.log('Image loaded successfully', img.width, img.height, imageUrl)
+      processImage(img)
+    }
+
     img.onerror = (error) => {
-      console.error('Error loading image:', error)
+      console.error('Error loading image:', error, imageUrl)
       setIsLoading(false)
       setPixels([])
     }
 
+    // Try loading without CORS first (OpenAI images may not support CORS)
     img.src = imageUrl
-  }, [imageUrl, pixelSize, dimensions])
+  }, [imageUrl, pixelSize, dimensions, mounted])
 
   if (!mounted) {
     return null
   }
 
-  // Always render background - default gradient if no image
+  // Default gradient background when no image
   if (!imageUrl) {
     return (
       <div 
@@ -149,20 +150,51 @@ export default function PixelatedBackground({ imageUrl, pixelSize = 15 }: Pixela
     )
   }
 
+  // Loading state
   if (isLoading) {
     return (
-      <div className="fixed inset-0 bg-black flex items-center justify-center">
-        <div className="text-white text-xl animate-pulse">Creating pixelated background...</div>
+      <div 
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          backgroundColor: '#000000',
+          zIndex: -1,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <div style={{ color: 'white', fontSize: '1.25rem' }}>Creating pixelated background...</div>
       </div>
     )
   }
 
+  // Fallback: show image directly if pixelation failed
   if (pixels.length === 0) {
-    return null
+    return (
+      <div 
+        style={{ 
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          backgroundImage: `url(${imageUrl})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          zIndex: -1,
+        }}
+      />
+    )
   }
 
-  const columns = dimensions.width > 0 ? Math.ceil(dimensions.width / pixelSize) : 0
-  const rows = dimensions.height > 0 ? Math.ceil(dimensions.height / pixelSize) : 0
+  // Render pixelated background
+  const columns = Math.ceil(dimensions.width / pixelSize)
+  const rows = Math.ceil(dimensions.height / pixelSize)
 
   return (
     <div 
@@ -199,13 +231,10 @@ export default function PixelatedBackground({ imageUrl, pixelSize = 15 }: Pixela
               width: `${pixelSize}px`,
               height: `${pixelSize}px`,
               backgroundColor: pixel.color,
-              animationDelay: `${(index % 100) * 0.01}s`,
             }}
-            className="pixel-square"
           />
         ))}
       </div>
     </div>
   )
 }
-
