@@ -127,8 +127,8 @@ def generate_image(request: ImageRequest):
         response = client.images.generate(
             model="dall-e-3",
             prompt=prompt,
-            size="1024x1024",
-            quality="standard",
+            size="1792x1024",  # HD landscape size for better quality
+            quality="hd",  # High definition quality for crystal clear images
             n=1,
         )
         image_url = response.data[0].url

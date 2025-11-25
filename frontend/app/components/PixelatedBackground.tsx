@@ -80,24 +80,31 @@ function BackgroundImage({ imageUrl }: BackgroundImageProps) {
     )
   }
 
-  // Render clear, high-quality background image
+  // Render clear, high-quality background image using img element for maximum quality
   return (
-    <div 
-      style={{ 
+    <img
+      src={imageUrl}
+      alt="Background"
+      style={{
         position: 'fixed',
         top: 0,
         left: 0,
         width: '100vw',
         height: '100vh',
-        backgroundImage: `url(${imageUrl})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat',
+        objectFit: 'cover',
+        objectPosition: 'center',
         zIndex: -1,
         margin: 0,
         padding: 0,
         pointerEvents: 'none',
         imageRendering: 'auto',
+        WebkitBackfaceVisibility: 'hidden',
+        backfaceVisibility: 'hidden',
+        transform: 'translateZ(0)',
+        willChange: 'transform',
+        // Ensure no compression or quality loss
+        loading: 'eager',
+        decoding: 'async',
       }}
     />
   )
