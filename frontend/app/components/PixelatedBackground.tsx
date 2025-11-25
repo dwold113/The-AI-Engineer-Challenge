@@ -34,11 +34,14 @@ export default function PixelatedBackground({ imageUrl, pixelSize = 15 }: Pixela
 
     setIsLoading(true)
     const img = new Image()
+    
+    // Try to load with CORS, but handle errors gracefully
     img.crossOrigin = 'anonymous'
     
     img.onload = () => {
+      console.log('Image loaded successfully', img.width, img.height)
       const canvas = document.createElement('canvas')
-      const ctx = canvas.getContext('2d')
+      const ctx = canvas.getContext('2d', { willReadFrequently: true })
       if (!ctx) {
         setIsLoading(false)
         return
@@ -107,11 +110,13 @@ export default function PixelatedBackground({ imageUrl, pixelSize = 15 }: Pixela
         }
       }
 
+      console.log('Pixel data generated:', pixelData.length, 'pixels')
       setPixels(pixelData)
       setIsLoading(false)
     }
 
-    img.onerror = () => {
+    img.onerror = (error) => {
+      console.error('Error loading image:', error)
       setIsLoading(false)
       setPixels([])
     }
@@ -133,12 +138,16 @@ export default function PixelatedBackground({ imageUrl, pixelSize = 15 }: Pixela
     )
   }
 
+  if (pixels.length === 0) {
+    return null
+  }
+
   const columns = dimensions.width > 0 ? Math.ceil(dimensions.width / pixelSize) : 0
   const rows = dimensions.height > 0 ? Math.ceil(dimensions.height / pixelSize) : 0
 
   return (
     <div 
-      className="fixed inset-0 bg-black z-0" 
+      className="fixed inset-0 bg-black z-0 pointer-events-none" 
       style={{ 
         width: '100vw',
         height: '100vh',
@@ -146,6 +155,7 @@ export default function PixelatedBackground({ imageUrl, pixelSize = 15 }: Pixela
         left: 0,
         right: 0,
         bottom: 0,
+        zIndex: 0,
       }}
     >
       <div 
@@ -155,8 +165,11 @@ export default function PixelatedBackground({ imageUrl, pixelSize = 15 }: Pixela
           gridTemplateColumns: `repeat(${columns}, ${pixelSize}px)`,
           gridTemplateRows: `repeat(${rows}, ${pixelSize}px)`,
           gap: '0',
-          width: '100%',
-          height: '100%',
+          width: '100vw',
+          height: '100vh',
+          position: 'fixed',
+          top: 0,
+          left: 0,
         }}
       >
         {pixels.map((pixel, index) => (
@@ -168,7 +181,7 @@ export default function PixelatedBackground({ imageUrl, pixelSize = 15 }: Pixela
               backgroundColor: pixel.color,
               animationDelay: `${(index % 100) * 0.01}s`,
             }}
-            className="pixel-square transition-all duration-300 ease-in-out"
+            className="pixel-square"
           />
         ))}
       </div>

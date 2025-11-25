@@ -100,18 +100,6 @@ export default function Home() {
             </div>
           </div>
           
-          {imageUrl && (
-            <div className="mt-6 bg-black/80 backdrop-blur-md rounded-xl p-6 shadow-2xl border border-white/10 animate-fade-in">
-              <p className="text-white/90 text-sm font-medium mb-3">Original Image:</p>
-              <div className="rounded-lg overflow-hidden border border-white/20">
-                <img 
-                  src={imageUrl} 
-                  alt="Generated" 
-                  className="w-full h-auto"
-                />
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </main>
