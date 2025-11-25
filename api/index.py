@@ -42,8 +42,7 @@ def chat(request: ChatRequest):
         response = client.chat.completions.create(
             model="gpt-5",
             messages=[
-                {"role": "system", "content": "You are a supportive helper."},
-                {"role": "developer", "content": "You are an expert on AI and pixelated backgrounds. You have a good taste of design and can build impressive pixelated backgrounds."},
+                {"role": "system", "content": "You are a supportive helper. You generate photos pixilated and have good taste in UI choices"},
                 {"role": "user", "content": user_message}
             ]
         )
@@ -56,10 +55,17 @@ def generate_image(request: ImageRequest):
     if not os.getenv("OPENAI_API_KEY"):
         raise HTTPException(status_code=500, detail="OPENAI_API_KEY not configured")
     
+    # Basic prompt validation
+    prompt = request.prompt.strip()
+    if len(prompt) < 3:
+        raise HTTPException(status_code=400, detail="Prompt is too short. Please provide more details.")
+    if len(prompt) > 1000:
+        raise HTTPException(status_code=400, detail="Prompt is too long. Please keep it under 1000 characters.")
+    
     try:
         response = client.images.generate(
             model="dall-e-3",
-            prompt=request.prompt,
+            prompt=prompt,
             size="1024x1024",
             quality="standard",
             n=1,
@@ -76,4 +82,17 @@ def generate_image(request: ImageRequest):
         
         return {"image_url": image_data_url}
     except Exception as e:
+        error_str = str(e).lower()
+        # Check for content policy violations
+        if 'content_policy' in error_str or 'safety' in error_str or 'policy' in error_str:
+            raise HTTPException(
+                status_code=400, 
+                detail="This prompt may violate content policies. Please try a different, more appropriate description."
+            )
+        # Check for invalid prompts
+        if 'invalid' in error_str or 'malformed' in error_str:
+            raise HTTPException(
+                status_code=400,
+                detail="The prompt doesn't make sense or is invalid. Please provide a clearer description of the background you want."
+            )
         raise HTTPException(status_code=500, detail=f"Error generating image: {str(e)}")
