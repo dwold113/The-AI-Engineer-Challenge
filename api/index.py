@@ -92,7 +92,7 @@ def validate_prompt_makes_sense(prompt: str) -> tuple[bool, str]:
     return (False, "Please provide a clearer description of the background you want to see.")
 
 @app.post("/api/generate-image")
-def generate_image(request: ImageRequest):
+async def generate_image(request: ImageRequest):
     if not os.getenv("OPENAI_API_KEY"):
         raise HTTPException(status_code=500, detail="OPENAI_API_KEY not configured")
     
@@ -103,7 +103,7 @@ def generate_image(request: ImageRequest):
     if len(prompt) > 1000:
         raise HTTPException(status_code=400, detail="Prompt is too long. Please keep it under 1000 characters.")
     
-    # AI-based validation to check if prompt makes sense
+    # Fast validation to check if prompt makes sense
     is_valid, validation_message = validate_prompt_makes_sense(prompt)
     if not is_valid:
         raise HTTPException(
@@ -112,19 +112,19 @@ def generate_image(request: ImageRequest):
         )
     
     try:
+        # Use smallest HD size for fastest generation while maintaining highest quality
         response = client.images.generate(
             model="dall-e-3",
             prompt=prompt,
-            size="1024x1792",  # Standard size - faster generation while maintaining quality
-            quality="standard",  # Standard quality for faster generation (still very clear)
+            size="1024x1024",  # Smallest size for fastest generation
+            quality="hd",  # HD quality for highest image clarity
             n=1,
         )
         image_url = response.data[0].url
         
-        # Fetch the image and convert to base64 to avoid CORS issues
-        # Use shorter timeout and optimize for speed
-        with httpx.Client(timeout=15.0) as http_client:
-            img_response = http_client.get(image_url, timeout=15.0)
+        # Fetch the image asynchronously and convert to base64 to avoid CORS issues
+        async with httpx.AsyncClient(timeout=10.0) as http_client:
+            img_response = await http_client.get(image_url)
             img_response.raise_for_status()
             image_data = img_response.content
             image_base64 = base64.b64encode(image_data).decode('utf-8')
