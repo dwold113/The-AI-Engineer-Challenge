@@ -1,16 +1,21 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "api/index.py",
-      "use": "@vercel/python"
+  "framework": "nextjs",
+  "buildCommand": "cd frontend && npm install && npm run build",
+  "outputDirectory": "frontend/.next",
+  "functions": {
+    "api/*.py": {
+      "runtime": "python3.11"
     }
-  ],
+  },
   "routes": [
     {
+      "src": "/api/(.*)",
+      "dest": "/api/$1.py"
+    },
+    {
       "src": "/(.*)",
-      "dest": "api/index.py"
+      "dest": "/frontend/$1"
     }
   ]
 }
-
