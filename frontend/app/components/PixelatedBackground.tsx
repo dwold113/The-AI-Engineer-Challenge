@@ -11,9 +11,21 @@ function BackgroundImage({ imageUrl }: BackgroundImageProps) {
   const [mounted, setMounted] = useState(false)
   const [imageLoaded, setImageLoaded] = useState(false)
   const [imageAspectRatio, setImageAspectRatio] = useState<number | null>(null)
+  const [screenAspectRatio, setScreenAspectRatio] = useState<number>(16/9)
 
   useEffect(() => {
     setMounted(true)
+  }, [])
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const updateAspectRatio = () => {
+        setScreenAspectRatio(window.innerWidth / window.innerHeight)
+      }
+      updateAspectRatio()
+      window.addEventListener('resize', updateAspectRatio)
+      return () => window.removeEventListener('resize', updateAspectRatio)
+    }
   }, [])
 
   useEffect(() => {
@@ -107,19 +119,6 @@ function BackgroundImage({ imageUrl }: BackgroundImageProps) {
 
   // Determine best fit mode based on image and screen aspect ratio
   // Use 'contain' for portrait images to show full image without cropping
-  const [screenAspectRatio, setScreenAspectRatio] = useState<number>(16/9)
-  
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const updateAspectRatio = () => {
-        setScreenAspectRatio(window.innerWidth / window.innerHeight)
-      }
-      updateAspectRatio()
-      window.addEventListener('resize', updateAspectRatio)
-      return () => window.removeEventListener('resize', updateAspectRatio)
-    }
-  }, [])
-
   // Use 'contain' when image orientation doesn't match screen to prevent cropping
   // This is especially important for portrait iPhone photos
   const useContain = imageAspectRatio !== null && 
