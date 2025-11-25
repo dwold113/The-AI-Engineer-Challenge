@@ -2,17 +2,26 @@
 @tailwind components;
 @tailwind utilities;
 
+* {
+  box-sizing: border-box;
+}
+
 html, body {
-  margin: 0;
-  padding: 0;
+  margin: 0 !important;
+  padding: 0 !important;
   overflow-x: hidden;
   overflow-y: auto;
   width: 100%;
   height: 100%;
+  background-color: transparent !important;
 }
 
 body {
-  background-color: transparent;
+  background-color: transparent !important;
+}
+
+#__next {
+  background-color: transparent !important;
 }
 
 @keyframes fade-in {

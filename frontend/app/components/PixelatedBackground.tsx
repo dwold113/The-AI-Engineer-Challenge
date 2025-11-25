@@ -124,17 +124,20 @@ export default function PixelatedBackground({ imageUrl, pixelSize = 15 }: Pixela
     img.src = imageUrl
   }, [imageUrl, pixelSize, dimensions])
 
+  // Always render background - default gradient if no image
   if (!imageUrl) {
     return (
       <div 
-        className="fixed inset-0 bg-gradient-to-br from-purple-900 via-blue-900 to-black z-0" 
         style={{
-          width: '100vw',
-          height: '100vh',
           position: 'fixed',
           top: 0,
           left: 0,
-          zIndex: 0,
+          width: '100vw',
+          height: '100vh',
+          background: 'linear-gradient(to bottom right, #581c87, #1e3a8a, #000000)',
+          zIndex: -1,
+          margin: 0,
+          padding: 0,
         }}
       />
     )
@@ -157,14 +160,17 @@ export default function PixelatedBackground({ imageUrl, pixelSize = 15 }: Pixela
 
   return (
     <div 
-      className="fixed inset-0 bg-black pointer-events-none" 
       style={{ 
-        width: '100vw',
-        height: '100vh',
         position: 'fixed',
         top: 0,
         left: 0,
-        zIndex: 0,
+        width: '100vw',
+        height: '100vh',
+        backgroundColor: '#000000',
+        zIndex: -1,
+        margin: 0,
+        padding: 0,
+        pointerEvents: 'none',
       }}
     >
       <div 
@@ -172,7 +178,7 @@ export default function PixelatedBackground({ imageUrl, pixelSize = 15 }: Pixela
           display: 'grid',
           gridTemplateColumns: `repeat(${columns}, ${pixelSize}px)`,
           gridTemplateRows: `repeat(${rows}, ${pixelSize}px)`,
-          gap: '0',
+          gap: 0,
           width: '100vw',
           height: '100vh',
           position: 'absolute',
