@@ -35,6 +35,13 @@ const validatePrompt = (prompt: string): { valid: boolean; error?: string } => {
     return { valid: false, error: 'Please provide more details about the background you want to create.' }
   }
   
+  // Check for common test/nonsensical words
+  const testWords = ['dummy', 'test', 'placeholder', 'example', 'sample', 'asdf', 'qwerty', '123', 'abc']
+  const lowerPrompt = trimmed.toLowerCase()
+  if (testWords.some(word => lowerPrompt === word || lowerPrompt.split(/\s+/).includes(word))) {
+    return { valid: false, error: 'This doesn\'t describe a visual scene. Please describe what you want to see, like "a sunset over mountains" or "a cozy coffee shop".' }
+  }
+  
   return { valid: true }
 }
 

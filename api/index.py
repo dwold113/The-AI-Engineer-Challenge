@@ -42,13 +42,66 @@ def chat(request: ChatRequest):
         response = client.chat.completions.create(
             model="gpt-5",
             messages=[
-                {"role": "system", "content": "You are a supportive helper. You generate photos pixilated and have good taste in UI choices"},
+                {"role": "system", "content": "You are a supportive helper"},
+                {"role": "developer", "content": "You are able to use common sense and determine if the promt should be generated"},
                 {"role": "user", "content": user_message}
             ]
         )
         return {"reply": response.choices[0].message.content}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error calling OpenAI API: {str(e)}")
+
+def validate_prompt_makes_sense(prompt: str) -> tuple[bool, str]:
+    """
+    Use AI to validate if a prompt makes sense for image generation.
+    Returns (is_valid, message)
+    """
+    try:
+        validation_prompt = f"""Analyze this image generation prompt and determine if it makes sense for creating a background image. 
+
+Prompt: "{prompt}"
+
+Respond with ONLY one of these two options:
+1. If the prompt makes sense and describes a visual scene/background: "VALID"
+2. If the prompt is vague, nonsensical, or doesn't describe a visual scene: "INVALID: [brief explanation of why it doesn't make sense and what the user should provide instead]"
+
+Examples:
+- "dummy prompt" -> "INVALID: This doesn't describe a visual scene. Please describe what you want to see, like 'a sunset over mountains' or 'a cozy coffee shop'."
+- "test" -> "INVALID: This is too vague. Please describe a specific scene or background you'd like to see."
+- "a serene mountain landscape at sunset" -> "VALID"
+- "cyberpunk city at night" -> "VALID"
+
+Your response:"""
+
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",  # Use cheaper model for validation
+            messages=[
+                {"role": "system", "content": "You are a prompt validator. You determine if image generation prompts make sense. Be strict - only approve prompts that clearly describe visual scenes or backgrounds."},
+                {"role": "user", "content": validation_prompt}
+            ],
+            max_tokens=150,
+            temperature=0.3
+        )
+        
+        result = response.choices[0].message.content.strip().upper()
+        
+        if result.startswith("VALID"):
+            return (True, "")
+        elif result.startswith("INVALID"):
+            # Extract the explanation
+            explanation = result.replace("INVALID", "").strip()
+            if explanation.startswith(":"):
+                explanation = explanation[1:].strip()
+            return (False, explanation if explanation else "This prompt doesn't clearly describe a visual scene. Please provide more details about what background you want to see.")
+        else:
+            # If response format is unexpected, default to checking manually
+            if len(prompt.split()) < 3 or any(word in prompt.lower() for word in ['test', 'dummy', 'placeholder', 'example', 'sample']):
+                return (False, "Please provide a clear description of the background you want to see, not a test or placeholder text.")
+            return (True, "")
+    except Exception as e:
+        # If validation fails, do basic checks and allow generation
+        print(f"Validation error: {e}")
+        return (True, "")
 
 @app.post("/api/generate-image")
 def generate_image(request: ImageRequest):
@@ -61,6 +114,14 @@ def generate_image(request: ImageRequest):
         raise HTTPException(status_code=400, detail="Prompt is too short. Please provide more details.")
     if len(prompt) > 1000:
         raise HTTPException(status_code=400, detail="Prompt is too long. Please keep it under 1000 characters.")
+    
+    # AI-based validation to check if prompt makes sense
+    is_valid, validation_message = validate_prompt_makes_sense(prompt)
+    if not is_valid:
+        raise HTTPException(
+            status_code=400,
+            detail=validation_message or "This prompt doesn't clearly describe a visual scene. Please provide more details about what background you want to see."
+        )
     
     try:
         response = client.images.generate(
