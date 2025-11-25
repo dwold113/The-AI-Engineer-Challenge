@@ -10,9 +10,24 @@ interface PixelatedBackgroundProps {
 export default function PixelatedBackground({ imageUrl, pixelSize = 15 }: PixelatedBackgroundProps) {
   const [pixels, setPixels] = useState<Array<{ x: number; y: number; color: string }>>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [dimensions, setDimensions] = useState({ width: 0, height: 0 })
+
+  // Update dimensions on mount and resize
+  useEffect(() => {
+    const updateDimensions = () => {
+      setDimensions({
+        width: window.innerWidth,
+        height: window.innerHeight
+      })
+    }
+
+    updateDimensions()
+    window.addEventListener('resize', updateDimensions)
+    return () => window.removeEventListener('resize', updateDimensions)
+  }, [])
 
   useEffect(() => {
-    if (!imageUrl) {
+    if (!imageUrl || dimensions.width === 0 || dimensions.height === 0) {
       setPixels([])
       return
     }
@@ -29,9 +44,9 @@ export default function PixelatedBackground({ imageUrl, pixelSize = 15 }: Pixela
         return
       }
 
-      // Calculate dimensions to fill screen while maintaining aspect ratio
-      const screenWidth = window.innerWidth
-      const screenHeight = window.innerHeight
+      // Calculate dimensions to cover entire viewport (fill screen completely)
+      const screenWidth = dimensions.width
+      const screenHeight = dimensions.height
       const imgAspect = img.width / img.height
       const screenAspect = screenWidth / screenHeight
 
@@ -40,13 +55,14 @@ export default function PixelatedBackground({ imageUrl, pixelSize = 15 }: Pixela
       let offsetX = 0
       let offsetY = 0
 
+      // Cover mode: scale image to cover entire screen, cropping if necessary
       if (imgAspect > screenAspect) {
-        // Image is wider - fit to height
+        // Image is wider - scale to cover height, crop width
         drawHeight = screenHeight
         drawWidth = drawHeight * imgAspect
         offsetX = (screenWidth - drawWidth) / 2
       } else {
-        // Image is taller - fit to width
+        // Image is taller - scale to cover width, crop height
         drawWidth = screenWidth
         drawHeight = drawWidth / imgAspect
         offsetY = (screenHeight - drawHeight) / 2
@@ -59,7 +75,7 @@ export default function PixelatedBackground({ imageUrl, pixelSize = 15 }: Pixela
       ctx.fillStyle = '#000000'
       ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-      // Draw image centered
+      // Draw image to cover entire screen (may crop edges)
       ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight)
 
       // Extract pixel data
@@ -101,7 +117,7 @@ export default function PixelatedBackground({ imageUrl, pixelSize = 15 }: Pixela
     }
 
     img.src = imageUrl
-  }, [imageUrl, pixelSize])
+  }, [imageUrl, pixelSize, dimensions])
 
   if (!imageUrl) {
     return (
@@ -117,16 +133,27 @@ export default function PixelatedBackground({ imageUrl, pixelSize = 15 }: Pixela
     )
   }
 
-  const columns = Math.ceil(window.innerWidth / pixelSize)
+  const columns = dimensions.width > 0 ? Math.ceil(dimensions.width / pixelSize) : 0
+  const rows = dimensions.height > 0 ? Math.ceil(dimensions.height / pixelSize) : 0
 
   return (
-    <div className="fixed inset-0 overflow-hidden bg-black">
+    <div 
+      className="fixed inset-0 bg-black z-0" 
+      style={{ 
+        width: '100vw',
+        height: '100vh',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+      }}
+    >
       <div 
         className="absolute inset-0"
         style={{
           display: 'grid',
           gridTemplateColumns: `repeat(${columns}, ${pixelSize}px)`,
-          gridAutoRows: `${pixelSize}px`,
+          gridTemplateRows: `repeat(${rows}, ${pixelSize}px)`,
           gap: '0',
           width: '100%',
           height: '100%',

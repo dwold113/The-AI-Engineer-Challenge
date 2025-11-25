@@ -53,7 +53,7 @@ export default function Home() {
     <main className="relative min-h-screen">
       <PixelatedBackground imageUrl={imageUrl} pixelSize={15} />
       
-      <div className="relative z-10 flex flex-col items-center justify-center min-h-screen p-8">
+      <div className="relative z-10 flex flex-col items-center justify-center min-h-screen p-8" style={{ minHeight: '100vh' }}>
         <div className="w-full max-w-2xl">
           <h1 className="text-5xl font-bold text-white mb-8 text-center drop-shadow-2xl">
             Pixelated Background Generator
