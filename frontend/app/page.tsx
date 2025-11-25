@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import PixelatedBackground from './components/PixelatedBackground'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
@@ -10,6 +10,11 @@ export default function Home() {
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
@@ -49,8 +54,12 @@ export default function Home() {
     }
   }
 
+  if (!mounted) {
+    return null
+  }
+
   return (
-    <>
+    <div style={{ position: 'relative', minHeight: '100vh', width: '100vw' }}>
       <PixelatedBackground imageUrl={imageUrl} pixelSize={15} />
       <main className="relative min-h-screen" style={{ backgroundColor: 'transparent', position: 'relative', zIndex: 1 }}>
         <div className="relative z-10 flex flex-col items-center justify-center min-h-screen p-8" style={{ minHeight: '100vh' }}>
@@ -103,7 +112,7 @@ export default function Home() {
         </div>
       </div>
       </main>
-    </>
+    </div>
   )
 }
 

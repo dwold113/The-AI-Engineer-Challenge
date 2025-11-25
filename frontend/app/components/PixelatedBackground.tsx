@@ -11,9 +11,11 @@ export default function PixelatedBackground({ imageUrl, pixelSize = 15 }: Pixela
   const [pixels, setPixels] = useState<Array<{ x: number; y: number; color: string }>>([])
   const [isLoading, setIsLoading] = useState(false)
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 })
+  const [mounted, setMounted] = useState(false)
 
   // Update dimensions on mount and resize
   useEffect(() => {
+    setMounted(true)
     const updateDimensions = () => {
       setDimensions({
         width: window.innerWidth,
@@ -123,6 +125,10 @@ export default function PixelatedBackground({ imageUrl, pixelSize = 15 }: Pixela
 
     img.src = imageUrl
   }, [imageUrl, pixelSize, dimensions])
+
+  if (!mounted) {
+    return null
+  }
 
   // Always render background - default gradient if no image
   if (!imageUrl) {
