@@ -68,7 +68,7 @@ export default function Home() {
 
   return (
     <div style={{ position: 'relative', minHeight: '100vh', width: '100vw' }}>
-      <PixelatedBackground imageUrl={imageUrl} pixelSize={4} />
+      <PixelatedBackground imageUrl={imageUrl} pixelSize={6} />
       <main className="relative min-h-screen" style={{ backgroundColor: 'transparent', position: 'relative', zIndex: 1 }}>
         <div className="relative z-10 flex flex-col items-center justify-center min-h-screen p-8" style={{ minHeight: '100vh' }}>
         <div className="w-full max-w-2xl">

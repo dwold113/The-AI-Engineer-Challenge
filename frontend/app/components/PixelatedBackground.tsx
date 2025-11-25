@@ -85,7 +85,7 @@ function PixelatedBackground({ imageUrl, pixelSize = 4 }: PixelatedBackgroundPro
       ctx.fillStyle = '#000000'
       ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-      // Draw pixelated version
+      // Draw pixelated version with color quantization for retro pixel art look
       for (let y = 0; y < screenHeight; y += pixelSize) {
         for (let x = 0; x < screenWidth; x += pixelSize) {
           // Sample from center of pixel block
@@ -93,11 +93,18 @@ function PixelatedBackground({ imageUrl, pixelSize = 4 }: PixelatedBackgroundPro
           const sampleY = Math.min(y + Math.floor(pixelSize / 2), screenHeight - 1)
           
           const index = (sampleY * screenWidth + sampleX) * 4
-          const r = data[index]
-          const g = data[index + 1]
-          const b = data[index + 2]
+          let r = data[index]
+          let g = data[index + 1]
+          let b = data[index + 2]
           
-          // Draw the pixel square
+          // Color quantization - reduce color depth for more authentic pixel art look
+          // Quantize to 32 levels (0-255 -> 0-31 -> back to 0-255)
+          const quantizeLevels = 32
+          r = Math.floor(r / (256 / quantizeLevels)) * (256 / quantizeLevels)
+          g = Math.floor(g / (256 / quantizeLevels)) * (256 / quantizeLevels)
+          b = Math.floor(b / (256 / quantizeLevels)) * (256 / quantizeLevels)
+          
+          // Draw the pixel square with crisp edges
           ctx.fillStyle = `rgb(${r}, ${g}, ${b})`
           ctx.fillRect(x, y, pixelSize, pixelSize)
         }
