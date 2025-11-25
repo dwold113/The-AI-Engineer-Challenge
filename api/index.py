@@ -22,6 +22,9 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 class ChatRequest(BaseModel):
     message: str
 
+class ImageRequest(BaseModel):
+    prompt: str
+
 @app.get("/")
 def root():
     return {"status": "ok"}
@@ -43,3 +46,21 @@ def chat(request: ChatRequest):
         return {"reply": response.choices[0].message.content}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error calling OpenAI API: {str(e)}")
+
+@app.post("/api/generate-image")
+def generate_image(request: ImageRequest):
+    if not os.getenv("OPENAI_API_KEY"):
+        raise HTTPException(status_code=500, detail="OPENAI_API_KEY not configured")
+    
+    try:
+        response = client.images.generate(
+            model="dall-e-3",
+            prompt=request.prompt,
+            size="1024x1024",
+            quality="standard",
+            n=1,
+        )
+        image_url = response.data[0].url
+        return {"image_url": image_url}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating image: {str(e)}")
