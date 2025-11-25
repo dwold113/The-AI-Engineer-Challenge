@@ -9,6 +9,7 @@ interface BackgroundImageProps {
 function BackgroundImage({ imageUrl }: BackgroundImageProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const [imageLoaded, setImageLoaded] = useState(false)
 
   useEffect(() => {
     setMounted(true)
@@ -16,20 +17,32 @@ function BackgroundImage({ imageUrl }: BackgroundImageProps) {
 
   useEffect(() => {
     if (!imageUrl || !mounted) {
+      setImageLoaded(false)
       return
     }
 
+    // For data URLs (uploaded images), they're already loaded
+    if (imageUrl.startsWith('data:')) {
+      setIsLoading(false)
+      setImageLoaded(true)
+      return
+    }
+
+    // For remote URLs, check if image loads
     setIsLoading(true)
+    setImageLoaded(false)
     const img = new Image()
     
     img.onload = () => {
       console.log('Image loaded successfully', img.width, img.height)
       setIsLoading(false)
+      setImageLoaded(true)
     }
 
     img.onerror = (error) => {
       console.error('Error loading image:', error, imageUrl)
       setIsLoading(false)
+      setImageLoaded(false)
     }
 
     img.src = imageUrl
@@ -58,8 +71,8 @@ function BackgroundImage({ imageUrl }: BackgroundImageProps) {
     )
   }
 
-  // Loading state
-  if (isLoading) {
+  // Loading state (only for remote URLs)
+  if (isLoading && !imageUrl?.startsWith('data:')) {
     return (
       <div 
         style={{
@@ -87,6 +100,15 @@ function BackgroundImage({ imageUrl }: BackgroundImageProps) {
       alt="Background"
       loading="eager"
       decoding="async"
+      onLoad={() => {
+        setImageLoaded(true)
+        setIsLoading(false)
+      }}
+      onError={() => {
+        console.error('Error rendering image:', imageUrl)
+        setIsLoading(false)
+        setImageLoaded(false)
+      }}
       style={{
         position: 'fixed',
         top: 0,
@@ -104,6 +126,7 @@ function BackgroundImage({ imageUrl }: BackgroundImageProps) {
         backfaceVisibility: 'hidden',
         transform: 'translateZ(0)',
         willChange: 'transform',
+        display: imageUrl ? 'block' : 'none',
       }}
     />
   )
