@@ -3,7 +3,7 @@
   "buildCommand": "cd frontend && npm ci && npm run build",
   "outputDirectory": "frontend/.next",
   "installCommand": "cd frontend && npm ci",
-  "framework": null,
+  "framework": "nextjs",
   "builds": [
     {
       "src": "api/backend.py",
@@ -14,9 +14,6 @@
     {
       "src": "/api/(.*)",
       "dest": "api/backend.py"
-    },
-    {
-      "handle": "filesystem"
     },
     {
       "src": "/(.*)",
