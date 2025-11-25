@@ -1,14 +1,14 @@
 'use client'
 
-import { useEffect, useState, memo } from 'react'
+import { useEffect, useState, memo, useRef } from 'react'
 
 interface PixelatedBackgroundProps {
   imageUrl: string | null
   pixelSize?: number
 }
 
-function PixelatedBackground({ imageUrl, pixelSize = 15 }: PixelatedBackgroundProps) {
-  const [pixels, setPixels] = useState<Array<{ x: number; y: number; color: string }>>([])
+function PixelatedBackground({ imageUrl, pixelSize = 4 }: PixelatedBackgroundProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 })
   const [mounted, setMounted] = useState(false)
@@ -29,26 +29,26 @@ function PixelatedBackground({ imageUrl, pixelSize = 15 }: PixelatedBackgroundPr
   }, [])
 
   useEffect(() => {
-    if (!imageUrl || dimensions.width === 0 || dimensions.height === 0 || !mounted) {
-      setPixels([])
+    if (!imageUrl || dimensions.width === 0 || dimensions.height === 0 || !mounted || !canvasRef.current) {
       return
     }
 
     setIsLoading(true)
-    
-    const processImage = (image: HTMLImageElement) => {
-      console.log('Processing image:', image.width, image.height)
-      const canvas = document.createElement('canvas')
-      const ctx = canvas.getContext('2d', { willReadFrequently: true })
-      if (!ctx) {
-        console.error('Failed to get canvas context')
-        setIsLoading(false)
-        return
-      }
+    const canvas = canvasRef.current
+    const ctx = canvas.getContext('2d', { willReadFrequently: true })
+    if (!ctx) {
+      setIsLoading(false)
+      return
+    }
 
+    const img = new Image()
+    
+    img.onload = () => {
+      console.log('Image loaded successfully', img.width, img.height)
+      
       const screenWidth = dimensions.width
       const screenHeight = dimensions.height
-      const imgAspect = image.width / image.height
+      const imgAspect = img.width / img.height
       const screenAspect = screenWidth / screenHeight
 
       let drawWidth = screenWidth
@@ -75,52 +75,43 @@ function PixelatedBackground({ imageUrl, pixelSize = 15 }: PixelatedBackgroundPr
       ctx.fillRect(0, 0, canvas.width, canvas.height)
       
       // Draw image to cover entire screen
-      ctx.drawImage(image, offsetX, offsetY, drawWidth, drawHeight)
+      ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight)
 
-      // Extract pixel data with better sampling
-      const pixelData: Array<{ x: number; y: number; color: string }> = []
-      
+      // Get image data
+      const imageData = ctx.getImageData(0, 0, screenWidth, screenHeight)
+      const data = imageData.data
+
+      // Clear and redraw with pixelation
+      ctx.fillStyle = '#000000'
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+      // Draw pixelated version
       for (let y = 0; y < screenHeight; y += pixelSize) {
         for (let x = 0; x < screenWidth; x += pixelSize) {
-          // Sample from center of pixel block for better accuracy
+          // Sample from center of pixel block
           const sampleX = Math.min(x + Math.floor(pixelSize / 2), screenWidth - 1)
           const sampleY = Math.min(y + Math.floor(pixelSize / 2), screenHeight - 1)
           
-          const imageData = ctx.getImageData(sampleX, sampleY, 1, 1)
-          const data = imageData.data
+          const index = (sampleY * screenWidth + sampleX) * 4
+          const r = data[index]
+          const g = data[index + 1]
+          const b = data[index + 2]
           
-          // Use the center pixel color directly for sharper results
-          const r = data[0]
-          const g = data[1]
-          const b = data[2]
-          
-          pixelData.push({
-            x,
-            y,
-            color: `rgb(${r}, ${g}, ${b})`
-          })
+          // Draw the pixel square
+          ctx.fillStyle = `rgb(${r}, ${g}, ${b})`
+          ctx.fillRect(x, y, pixelSize, pixelSize)
         }
       }
 
-      console.log('Pixel data generated:', pixelData.length, 'pixels')
-      setPixels(pixelData)
+      console.log('Pixelated background rendered on canvas')
       setIsLoading(false)
-    }
-
-    const img = new Image()
-    
-    img.onload = () => {
-      console.log('Image loaded successfully', img.width, img.height, imageUrl)
-      processImage(img)
     }
 
     img.onerror = (error) => {
       console.error('Error loading image:', error, imageUrl)
       setIsLoading(false)
-      setPixels([])
     }
 
-    // Try loading without CORS first (OpenAI images may not support CORS)
     img.src = imageUrl
   }, [imageUrl, pixelSize, dimensions, mounted])
 
@@ -169,75 +160,23 @@ function PixelatedBackground({ imageUrl, pixelSize = 15 }: PixelatedBackgroundPr
     )
   }
 
-  // Fallback: show image directly if pixelation failed
-  if (pixels.length === 0) {
-    return (
-      <div 
-        style={{ 
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          width: '100vw',
-          height: '100vh',
-          backgroundImage: `url(${imageUrl})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
-          zIndex: -1,
-        }}
-      />
-    )
-  }
-
-  // Render pixelated background
-  const columns = Math.ceil(dimensions.width / pixelSize)
-  const rows = Math.ceil(dimensions.height / pixelSize)
-
+  // Render pixelated background using canvas
   return (
-    <div 
-      style={{ 
+    <canvas
+      ref={canvasRef}
+      style={{
         position: 'fixed',
         top: 0,
         left: 0,
         width: '100vw',
         height: '100vh',
-        backgroundColor: '#000000',
         zIndex: -1,
         margin: 0,
         padding: 0,
         pointerEvents: 'none',
+        imageRendering: 'pixelated',
       }}
-    >
-      <div 
-        style={{
-          display: 'grid',
-          gridTemplateColumns: `repeat(${columns}, ${pixelSize}px)`,
-          gridTemplateRows: `repeat(${rows}, ${pixelSize}px)`,
-          gap: 0,
-          width: '100vw',
-          height: '100vh',
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          willChange: 'contents',
-          transform: 'translateZ(0)',
-          contain: 'layout style paint',
-        }}
-      >
-        {pixels.map((pixel, index) => (
-          <div
-            key={`${pixel.x}-${pixel.y}-${index}`}
-            style={{
-              width: `${pixelSize}px`,
-              height: `${pixelSize}px`,
-              backgroundColor: pixel.color,
-              willChange: 'background-color',
-              transform: 'translateZ(0)',
-            }}
-          />
-        ))}
-      </div>
-    </div>
+    />
   )
 }
 
