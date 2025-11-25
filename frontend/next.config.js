@@ -9,8 +9,15 @@ const nextConfig = {
       },
     ],
   },
-  // For Vercel deployment - set root directory
-  basePath: process.env.NODE_ENV === 'production' ? '' : '',
+  // Proxy API calls to Python backend
+  async rewrites() {
+    return [
+      {
+        source: '/api/:path*',
+        destination: '/api/:path*', // This will be handled by vercel.json routing
+      },
+    ]
+  },
 }
 
 module.exports = nextConfig
