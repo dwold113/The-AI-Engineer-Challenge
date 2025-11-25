@@ -2,10 +2,6 @@
   "version": 2,
   "builds": [
     {
-      "src": "frontend/package.json",
-      "use": "@vercel/next"
-    },
-    {
       "src": "api/backend.py",
       "use": "@vercel/python"
     }
@@ -14,10 +10,6 @@
     {
       "src": "/api/(.*)",
       "dest": "api/backend.py"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "frontend/$1"
     }
   ]
 }

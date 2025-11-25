@@ -9,6 +9,8 @@ const nextConfig = {
       },
     ],
   },
+  // For Vercel deployment - set root directory
+  basePath: process.env.NODE_ENV === 'production' ? '' : '',
 }
 
 module.exports = nextConfig
