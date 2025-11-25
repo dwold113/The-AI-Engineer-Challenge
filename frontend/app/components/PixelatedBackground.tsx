@@ -1,0 +1,151 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+
+interface PixelatedBackgroundProps {
+  imageUrl: string | null
+  pixelSize?: number
+}
+
+export default function PixelatedBackground({ imageUrl, pixelSize = 15 }: PixelatedBackgroundProps) {
+  const [pixels, setPixels] = useState<Array<{ x: number; y: number; color: string }>>([])
+  const [isLoading, setIsLoading] = useState(false)
+
+  useEffect(() => {
+    if (!imageUrl) {
+      setPixels([])
+      return
+    }
+
+    setIsLoading(true)
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      const ctx = canvas.getContext('2d')
+      if (!ctx) {
+        setIsLoading(false)
+        return
+      }
+
+      // Calculate dimensions to fill screen while maintaining aspect ratio
+      const screenWidth = window.innerWidth
+      const screenHeight = window.innerHeight
+      const imgAspect = img.width / img.height
+      const screenAspect = screenWidth / screenHeight
+
+      let drawWidth = screenWidth
+      let drawHeight = screenHeight
+      let offsetX = 0
+      let offsetY = 0
+
+      if (imgAspect > screenAspect) {
+        // Image is wider - fit to height
+        drawHeight = screenHeight
+        drawWidth = drawHeight * imgAspect
+        offsetX = (screenWidth - drawWidth) / 2
+      } else {
+        // Image is taller - fit to width
+        drawWidth = screenWidth
+        drawHeight = drawWidth / imgAspect
+        offsetY = (screenHeight - drawHeight) / 2
+      }
+
+      canvas.width = screenWidth
+      canvas.height = screenHeight
+
+      // Fill background with black
+      ctx.fillStyle = '#000000'
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+      // Draw image centered
+      ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight)
+
+      // Extract pixel data
+      const pixelData: Array<{ x: number; y: number; color: string }> = []
+      
+      for (let y = 0; y < screenHeight; y += pixelSize) {
+        for (let x = 0; x < screenWidth; x += pixelSize) {
+          const imageData = ctx.getImageData(x, y, pixelSize, pixelSize)
+          const data = imageData.data
+          
+          // Calculate average color of the pixel block
+          let r = 0, g = 0, b = 0, count = 0
+          for (let i = 0; i < data.length; i += 4) {
+            r += data[i]
+            g += data[i + 1]
+            b += data[i + 2]
+            count++
+          }
+          
+          const avgR = Math.floor(r / count)
+          const avgG = Math.floor(g / count)
+          const avgB = Math.floor(b / count)
+          
+          pixelData.push({
+            x,
+            y,
+            color: `rgb(${avgR}, ${avgG}, ${avgB})`
+          })
+        }
+      }
+
+      setPixels(pixelData)
+      setIsLoading(false)
+    }
+
+    img.onerror = () => {
+      setIsLoading(false)
+      setPixels([])
+    }
+
+    img.src = imageUrl
+  }, [imageUrl, pixelSize])
+
+  if (!imageUrl) {
+    return (
+      <div className="fixed inset-0 bg-gradient-to-br from-purple-900 via-blue-900 to-black" />
+    )
+  }
+
+  if (isLoading) {
+    return (
+      <div className="fixed inset-0 bg-black flex items-center justify-center">
+        <div className="text-white text-xl animate-pulse">Creating pixelated background...</div>
+      </div>
+    )
+  }
+
+  const columns = Math.ceil(window.innerWidth / pixelSize)
+
+  return (
+    <div className="fixed inset-0 overflow-hidden bg-black">
+      <div 
+        className="absolute inset-0"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: `repeat(${columns}, ${pixelSize}px)`,
+          gridAutoRows: `${pixelSize}px`,
+          gap: '0',
+          width: '100%',
+          height: '100%',
+        }}
+      >
+        {pixels.map((pixel, index) => (
+          <div
+            key={`${pixel.x}-${pixel.y}-${index}`}
+            style={{
+              width: `${pixelSize}px`,
+              height: `${pixelSize}px`,
+              backgroundColor: pixel.color,
+              animationDelay: `${(index % 100) * 0.01}s`,
+            }}
+            className="pixel-square transition-all duration-300 ease-in-out"
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
