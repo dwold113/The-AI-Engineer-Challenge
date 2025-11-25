@@ -85,6 +85,8 @@ function BackgroundImage({ imageUrl }: BackgroundImageProps) {
     <img
       src={imageUrl}
       alt="Background"
+      loading="eager"
+      decoding="async"
       style={{
         position: 'fixed',
         top: 0,
@@ -102,9 +104,6 @@ function BackgroundImage({ imageUrl }: BackgroundImageProps) {
         backfaceVisibility: 'hidden',
         transform: 'translateZ(0)',
         willChange: 'transform',
-        // Ensure no compression or quality loss
-        loading: 'eager',
-        decoding: 'async',
       }}
     />
   )
