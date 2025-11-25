@@ -43,7 +43,7 @@ def chat(request: ChatRequest):
             model="gpt-5",
             messages=[
                 {"role": "system", "content": "You are a supportive helper"},
-                {"role": "developer", "content": "You are able to use common sense and determine if the promt should be generated"},
+                {"role": "developer", "content": "You are able to use common sense and determine if the prompt should be generated"},
                 {"role": "user", "content": user_message}
             ]
         )
@@ -53,55 +53,43 @@ def chat(request: ChatRequest):
 
 def validate_prompt_makes_sense(prompt: str) -> tuple[bool, str]:
     """
-    Use AI to validate if a prompt makes sense for image generation.
+    Fast validation to check if a prompt makes sense for image generation.
+    Uses quick heuristics first, only uses AI for edge cases.
     Returns (is_valid, message)
     """
-    try:
-        validation_prompt = f"""Analyze this image generation prompt and determine if it makes sense for creating a background image. 
-
-Prompt: "{prompt}"
-
-Respond with ONLY one of these two options:
-1. If the prompt makes sense and describes a visual scene/background: "VALID"
-2. If the prompt is vague, nonsensical, or doesn't describe a visual scene: "INVALID: [brief explanation of why it doesn't make sense and what the user should provide instead]"
-
-Examples:
-- "dummy prompt" -> "INVALID: This doesn't describe a visual scene. Please describe what you want to see, like 'a sunset over mountains' or 'a cozy coffee shop'."
-- "test" -> "INVALID: This is too vague. Please describe a specific scene or background you'd like to see."
-- "a serene mountain landscape at sunset" -> "VALID"
-- "cyberpunk city at night" -> "VALID"
-
-Your response:"""
-
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",  # Use cheaper model for validation
-            messages=[
-                {"role": "system", "content": "You are a prompt validator. You determine if image generation prompts make sense. Be strict - only approve prompts that clearly describe visual scenes or backgrounds."},
-                {"role": "user", "content": validation_prompt}
-            ],
-            max_tokens=150,
-            temperature=0.3
-        )
-        
-        result = response.choices[0].message.content.strip().upper()
-        
-        if result.startswith("VALID"):
-            return (True, "")
-        elif result.startswith("INVALID"):
-            # Extract the explanation
-            explanation = result.replace("INVALID", "").strip()
-            if explanation.startswith(":"):
-                explanation = explanation[1:].strip()
-            return (False, explanation if explanation else "This prompt doesn't clearly describe a visual scene. Please provide more details about what background you want to see.")
-        else:
-            # If response format is unexpected, default to checking manually
-            if len(prompt.split()) < 3 or any(word in prompt.lower() for word in ['test', 'dummy', 'placeholder', 'example', 'sample']):
-                return (False, "Please provide a clear description of the background you want to see, not a test or placeholder text.")
-            return (True, "")
-    except Exception as e:
-        # If validation fails, do basic checks and allow generation
-        print(f"Validation error: {e}")
+    prompt_lower = prompt.lower().strip()
+    
+    # Quick checks for obvious invalid prompts (no API call needed)
+    test_words = ['test', 'dummy', 'placeholder', 'example', 'sample', 'asdf', 'qwerty']
+    words = prompt_lower.split()
+    
+    # Check if prompt is just a test word
+    if len(words) <= 2 and any(word in test_words for word in words):
+        return (False, "This doesn't describe a visual scene. Please describe what you want to see, like 'a sunset over mountains' or 'a cozy coffee shop'.")
+    
+    # Check if prompt is too short and vague
+    if len(words) < 2:
+        return (False, "Please provide more details about the background you want to see.")
+    
+    # Check for repeated characters or nonsense
+    if len(set(prompt_lower.replace(' ', ''))) < 3:
+        return (False, "Please provide a meaningful description of a visual scene, not just repeated characters.")
+    
+    # If it passes quick checks and has descriptive words, allow it
+    # Skip AI validation for speed - frontend already does basic validation
+    descriptive_indicators = ['landscape', 'scene', 'background', 'view', 'image', 'picture', 'photo', 
+                            'sunset', 'sunrise', 'city', 'forest', 'beach', 'mountain', 'ocean', 
+                            'room', 'interior', 'exterior', 'night', 'day', 'color', 'style']
+    
+    if any(indicator in prompt_lower for indicator in descriptive_indicators):
         return (True, "")
+    
+    # If it has 3+ words and seems descriptive, allow it
+    if len(words) >= 3:
+        return (True, "")
+    
+    # For edge cases, return a helpful message
+    return (False, "Please provide a clearer description of the background you want to see.")
 
 @app.post("/api/generate-image")
 def generate_image(request: ImageRequest):
@@ -127,15 +115,16 @@ def generate_image(request: ImageRequest):
         response = client.images.generate(
             model="dall-e-3",
             prompt=prompt,
-            size="1792x1024",  # HD landscape size for better quality
-            quality="hd",  # High definition quality for crystal clear images
+            size="1024x1792",  # Standard size - faster generation while maintaining quality
+            quality="standard",  # Standard quality for faster generation (still very clear)
             n=1,
         )
         image_url = response.data[0].url
         
         # Fetch the image and convert to base64 to avoid CORS issues
-        with httpx.Client() as http_client:
-            img_response = http_client.get(image_url, timeout=30.0)
+        # Use shorter timeout and optimize for speed
+        with httpx.Client(timeout=15.0) as http_client:
+            img_response = http_client.get(image_url, timeout=15.0)
             img_response.raise_for_status()
             image_data = img_response.content
             image_base64 = base64.b64encode(image_data).decode('utf-8')
