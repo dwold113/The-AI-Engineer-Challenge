@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import PixelatedBackground from './components/PixelatedBackground'
+import BackgroundImage from './components/PixelatedBackground'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -68,19 +68,19 @@ export default function Home() {
 
   return (
     <div style={{ position: 'relative', minHeight: '100vh', width: '100vw' }}>
-      <PixelatedBackground imageUrl={imageUrl} pixelSize={6} />
+      <BackgroundImage imageUrl={imageUrl} />
       <main className="relative min-h-screen" style={{ backgroundColor: 'transparent', position: 'relative', zIndex: 1 }}>
         <div className="relative z-10 flex flex-col items-center justify-center min-h-screen p-8" style={{ minHeight: '100vh' }}>
         <div className="w-full max-w-2xl">
           <h1 className="text-5xl font-bold text-white mb-8 text-center drop-shadow-2xl">
-            Pixelated Background Generator
+            AI Background Generator
           </h1>
           
           <div className="bg-black/80 backdrop-blur-md rounded-xl p-8 shadow-2xl border border-white/10 animate-fade-in">
             <div className="flex flex-col gap-5">
               <div>
                 <label htmlFor="prompt" className="block text-white text-sm font-medium mb-3">
-                  What should your pixelated world look like? 🎨
+                  What background would you like to create? 🎨
                 </label>
                 <input
                   id="prompt"
@@ -88,7 +88,7 @@ export default function Home() {
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
                   onKeyPress={handleKeyPress}
-                  placeholder="✨ Describe your dream background! Try: 'cyberpunk city at night', 'magical forest with fireflies', 'underwater coral reef', 'neon-soaked retro arcade'..."
+                  placeholder="Describe your ideal background... Try: 'serene mountain landscape at sunset', 'futuristic cityscape with neon lights', 'tropical beach with palm trees', 'cozy coffee shop interior'..."
                   className="w-full px-5 py-4 rounded-lg bg-white/10 text-white placeholder-white/40 border border-white/20 focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-transparent transition-all text-lg"
                   disabled={isGenerating}
                 />
@@ -111,7 +111,7 @@ export default function Home() {
                     Generating...
                   </span>
                 ) : (
-                  'Generate Pixelated Background'
+                  'Generate Background'
                 )}
               </button>
             </div>
