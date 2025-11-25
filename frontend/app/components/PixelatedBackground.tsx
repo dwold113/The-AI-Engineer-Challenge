@@ -77,30 +77,27 @@ export default function PixelatedBackground({ imageUrl, pixelSize = 15 }: Pixela
       // Draw image to cover entire screen
       ctx.drawImage(image, offsetX, offsetY, drawWidth, drawHeight)
 
-      // Extract pixel data
+      // Extract pixel data with better sampling
       const pixelData: Array<{ x: number; y: number; color: string }> = []
       
       for (let y = 0; y < screenHeight; y += pixelSize) {
         for (let x = 0; x < screenWidth; x += pixelSize) {
-          const imageData = ctx.getImageData(x, y, pixelSize, pixelSize)
+          // Sample from center of pixel block for better accuracy
+          const sampleX = Math.min(x + Math.floor(pixelSize / 2), screenWidth - 1)
+          const sampleY = Math.min(y + Math.floor(pixelSize / 2), screenHeight - 1)
+          
+          const imageData = ctx.getImageData(sampleX, sampleY, 1, 1)
           const data = imageData.data
           
-          let r = 0, g = 0, b = 0, count = 0
-          for (let i = 0; i < data.length; i += 4) {
-            r += data[i]
-            g += data[i + 1]
-            b += data[i + 2]
-            count++
-          }
-          
-          const avgR = Math.floor(r / count)
-          const avgG = Math.floor(g / count)
-          const avgB = Math.floor(b / count)
+          // Use the center pixel color directly for sharper results
+          const r = data[0]
+          const g = data[1]
+          const b = data[2]
           
           pixelData.push({
             x,
             y,
-            color: `rgb(${avgR}, ${avgG}, ${avgB})`
+            color: `rgb(${r}, ${g}, ${b})`
           })
         }
       }
