@@ -68,7 +68,7 @@ export default function Home() {
 
   return (
     <div style={{ position: 'relative', minHeight: '100vh', width: '100vw' }}>
-      <PixelatedBackground imageUrl={imageUrl} pixelSize={15} />
+      <PixelatedBackground imageUrl={imageUrl} pixelSize={8} />
       <main className="relative min-h-screen" style={{ backgroundColor: 'transparent', position: 'relative', zIndex: 1 }}>
         <div className="relative z-10 flex flex-col items-center justify-center min-h-screen p-8" style={{ minHeight: '100vh' }}>
         <div className="w-full max-w-2xl">
@@ -80,7 +80,7 @@ export default function Home() {
             <div className="flex flex-col gap-5">
               <div>
                 <label htmlFor="prompt" className="block text-white text-sm font-medium mb-3">
-                  Enter your prompt
+                  What should your pixelated world look like? 🎨
                 </label>
                 <input
                   id="prompt"
@@ -88,7 +88,7 @@ export default function Home() {
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
                   onKeyPress={handleKeyPress}
-                  placeholder="e.g., a sunset over mountains, abstract geometric patterns, space nebula..."
+                  placeholder="✨ Describe your dream background! Try: 'cyberpunk city at night', 'magical forest with fireflies', 'underwater coral reef', 'neon-soaked retro arcade'..."
                   className="w-full px-5 py-4 rounded-lg bg-white/10 text-white placeholder-white/40 border border-white/20 focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-transparent transition-all text-lg"
                   disabled={isGenerating}
                 />
