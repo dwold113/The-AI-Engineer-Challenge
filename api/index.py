@@ -30,7 +30,13 @@ class ImageRequest(BaseModel):
 
 @app.get("/")
 def root():
-    return {"status": "ok"}
+    # Debug endpoint to check if environment variable is set (remove in production)
+    api_key_set = bool(os.getenv("OPENAI_API_KEY"))
+    return {
+        "status": "ok",
+        "openai_api_key_configured": api_key_set,
+        "note": "Remove this debug info in production"
+    }
 
 @app.post("/api/chat")
 def chat(request: ChatRequest):
