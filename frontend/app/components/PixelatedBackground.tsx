@@ -1,13 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, memo } from 'react'
 
 interface PixelatedBackgroundProps {
   imageUrl: string | null
   pixelSize?: number
 }
 
-export default function PixelatedBackground({ imageUrl, pixelSize = 15 }: PixelatedBackgroundProps) {
+function PixelatedBackground({ imageUrl, pixelSize = 15 }: PixelatedBackgroundProps) {
   const [pixels, setPixels] = useState<Array<{ x: number; y: number; color: string }>>([])
   const [isLoading, setIsLoading] = useState(false)
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 })
@@ -219,6 +219,9 @@ export default function PixelatedBackground({ imageUrl, pixelSize = 15 }: Pixela
           position: 'absolute',
           top: 0,
           left: 0,
+          willChange: 'contents',
+          transform: 'translateZ(0)',
+          contain: 'layout style paint',
         }}
       >
         {pixels.map((pixel, index) => (
@@ -228,6 +231,8 @@ export default function PixelatedBackground({ imageUrl, pixelSize = 15 }: Pixela
               width: `${pixelSize}px`,
               height: `${pixelSize}px`,
               backgroundColor: pixel.color,
+              willChange: 'background-color',
+              transform: 'translateZ(0)',
             }}
           />
         ))}
@@ -235,3 +240,5 @@ export default function PixelatedBackground({ imageUrl, pixelSize = 15 }: Pixela
     </div>
   )
 }
+
+export default memo(PixelatedBackground)
