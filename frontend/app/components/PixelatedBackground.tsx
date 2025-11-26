@@ -117,27 +117,27 @@ function BackgroundImage({ imageUrl }: BackgroundImageProps) {
     )
   }
 
-  // Smart fit mode: Use judgment to decide between 'cover' and 'contain'
-  // Use 'cover' when aspect ratios are similar (won't crop much)
-  // Use 'contain' when aspect ratios are very different (to avoid significant cropping)
+  // Smart fit mode logic:
+  // - AI-generated images: ALWAYS use 'cover' to fill entire screen
+  // - Uploaded images/GIFs: Use smart judgment based on aspect ratio
   const isUploadedImage = imageUrl?.startsWith('data:')
   
   let useContain = false
   
   if (imageAspectRatio !== null) {
-    // Calculate aspect ratio difference
-    const aspectRatioDiff = Math.abs(imageAspectRatio - screenAspectRatio)
-    const ratioDifference = aspectRatioDiff / Math.max(imageAspectRatio, screenAspectRatio)
-    
-    // For generated images: always use cover (they're designed to be backgrounds)
     if (!isUploadedImage) {
+      // AI-generated images: ALWAYS cover the full screen
       useContain = false
     } else {
-      // For uploaded images: use smart judgment
-      // If aspect ratios are similar (within 30% difference), use cover
+      // Uploaded images/GIFs: Use smart judgment
+      // Calculate aspect ratio difference
+      const aspectRatioDiff = Math.abs(imageAspectRatio - screenAspectRatio)
+      const ratioDifference = aspectRatioDiff / Math.max(imageAspectRatio, screenAspectRatio)
+      
+      // If aspect ratios are similar (within 30% difference), use cover to fill screen
       // If very different (more than 30% difference), use contain to avoid cropping
       if (ratioDifference > 0.3) {
-        // Aspect ratios are very different - use contain to show full image
+        // Aspect ratios are very different - use contain to show full image without cropping
         useContain = true
       } else {
         // Aspect ratios are similar - use cover to fill screen
