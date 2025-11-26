@@ -134,88 +134,40 @@ export default function Home() {
     }
   }
 
-  // Comprehensive image upload validation
-  const validateImageFile = (file: File): { valid: boolean; error?: string } => {
-    // 1. Check if file exists
-    if (!file) {
-      return { valid: false, error: 'No file selected. Please choose an image file.' }
-    }
-
-    // 2. Check for empty files
-    if (file.size === 0) {
-      return { valid: false, error: 'The selected file is empty. Please choose a valid image file.' }
-    }
-
-    // 3. Check minimum file size (files smaller than 100 bytes are likely corrupted)
-    if (file.size < 100) {
-      return { valid: false, error: 'The file is too small and may be corrupted. Please choose a valid image file.' }
-    }
-
-    // 4. Check maximum file size (10MB)
-    const maxSize = 10 * 1024 * 1024 // 10MB
-    if (file.size > maxSize) {
-      const sizeMB = (file.size / (1024 * 1024)).toFixed(2)
-      return { valid: false, error: `Image file is too large (${sizeMB}MB). Please upload an image smaller than 10MB.` }
-    }
-
-    // 5. Validate file extension
-    const validExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg']
-    const fileName = file.name.toLowerCase()
-    const hasValidExtension = validExtensions.some(ext => fileName.endsWith(ext))
-    
-    if (!hasValidExtension) {
-      return { valid: false, error: 'Invalid file type. Please upload a JPEG, PNG, GIF, WebP, BMP, or SVG image.' }
-    }
-
-    // 6. Validate MIME type (more specific than just 'image/')
-    const validMimeTypes = [
-      'image/jpeg',
-      'image/jpg',
-      'image/png',
-      'image/gif',
-      'image/webp',
-      'image/bmp',
-      'image/svg+xml',
-      'image/x-icon',
-      'image/vnd.microsoft.icon'
-    ]
-    
-    // Check if MIME type is valid or if file type is empty (some browsers don't set it)
-    if (file.type && !validMimeTypes.includes(file.type.toLowerCase())) {
-      // If MIME type is set but invalid, reject it
-      if (file.type.startsWith('image/')) {
-        // Some browsers report generic 'image/*' - allow if extension is valid
-        if (file.type === 'image/*' && hasValidExtension) {
-          // Allow through, will validate by loading image
-        } else {
-          return { valid: false, error: `Unsupported image format (${file.type}). Please use JPEG, PNG, GIF, or WebP.` }
-        }
-      } else {
-        return { valid: false, error: 'Please upload an image file (JPEG, PNG, GIF, WebP, etc.)' }
-      }
-    }
-
-    // 7. Check for suspicious file names (potential security issue)
-    if (fileName.includes('..') || fileName.includes('/') || fileName.includes('\\')) {
-      return { valid: false, error: 'Invalid file name. Please use a valid image file.' }
-    }
-
-    // 8. Check for extremely long file names (potential DoS)
-    if (file.name.length > 255) {
-      return { valid: false, error: 'File name is too long. Please rename the file and try again.' }
-    }
-
-    return { valid: true }
-  }
-
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
-    
-    // Validate file
-    const validation = validateImageFile(file)
-    if (!validation.valid) {
-      setError(validation.error || 'Invalid file. Please try again.')
-      // Reset file input
+    if (!file) return
+
+    // Edge case: Empty file
+    if (file.size === 0) {
+      setError('The selected file is empty. Please choose a valid image file.')
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+      return
+    }
+
+    // Edge case: File too small (likely corrupted)
+    if (file.size < 100) {
+      setError('The file is too small and may be corrupted. Please choose a valid image file.')
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+      return
+    }
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setError('Please upload an image file (JPEG, PNG, GIF, etc.)')
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+      return
+    }
+
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      setError('Image file is too large. Please upload an image smaller than 10MB.')
       if (fileInputRef.current) {
         fileInputRef.current.value = ''
       }
@@ -225,67 +177,23 @@ export default function Home() {
     setError(null)
     setIsGenerating(true)
 
-    // Create image object to validate it's actually an image and get dimensions
-    const img = new Image()
     const reader = new FileReader()
-
-    // Set up image load handler (validates the image can actually be loaded)
-    img.onload = () => {
-      // 9. Validate image dimensions
-      const maxDimension = 10000 // 10,000 pixels max per side
-      const minDimension = 1 // At least 1 pixel
-      
-      if (img.width < minDimension || img.height < minDimension) {
-        setError('Image dimensions are too small. Please upload a valid image.')
-        setIsGenerating(false)
-        if (fileInputRef.current) {
-          fileInputRef.current.value = ''
-        }
-        return
-      }
-
-      if (img.width > maxDimension || img.height > maxDimension) {
-        setError(`Image dimensions are too large (${img.width}x${img.height}). Maximum size is 10,000x10,000 pixels.`)
-        setIsGenerating(false)
-        if (fileInputRef.current) {
-          fileInputRef.current.value = ''
-        }
-        return
-      }
-
-      // 10. Check for extremely large images that might cause memory issues
-      // Estimate memory usage: width * height * 4 bytes (RGBA)
-      const estimatedMemoryMB = (img.width * img.height * 4) / (1024 * 1024)
-      if (estimatedMemoryMB > 500) { // 500MB memory limit
-        setError('Image is too large and may cause performance issues. Please use a smaller image.')
-        setIsGenerating(false)
-        if (fileInputRef.current) {
-          fileInputRef.current.value = ''
-        }
-        return
-      }
-
-      // Image is valid, set it
-      if (reader.result && typeof reader.result === 'string') {
-        setImageUrl(reader.result)
-        setIsGenerating(false)
-      }
-    }
-
-    img.onerror = () => {
-      // 11. Handle corrupted or invalid image files
-      setError('The file appears to be corrupted or is not a valid image. Please try a different file.')
-      setIsGenerating(false)
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ''
-      }
-    }
-
-    // Set up FileReader handlers
     reader.onload = (e) => {
       const result = e.target?.result
       if (typeof result === 'string') {
-        // Try to load the image to validate it's actually an image
+        // Edge case: Validate image can actually load (catches corrupted files)
+        const img = new Image()
+        img.onload = () => {
+          setImageUrl(result)
+          setIsGenerating(false)
+        }
+        img.onerror = () => {
+          setError('The file appears to be corrupted or is not a valid image. Please try a different file.')
+          setIsGenerating(false)
+          if (fileInputRef.current) {
+            fileInputRef.current.value = ''
+          }
+        }
         img.src = result
       } else {
         setError('Failed to read the image file. Please try again.')
@@ -295,37 +203,14 @@ export default function Home() {
         }
       }
     }
-
     reader.onerror = () => {
-      // 12. Handle FileReader errors
-      setError('Failed to read the image file. The file may be corrupted or inaccessible.')
+      setError('Failed to read the image file. Please try again.')
       setIsGenerating(false)
       if (fileInputRef.current) {
         fileInputRef.current.value = ''
       }
     }
-
-    reader.onabort = () => {
-      // 13. Handle user cancellation
-      setError('File upload was cancelled.')
-      setIsGenerating(false)
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ''
-      }
-    }
-
-    // Start reading the file
-    try {
-      reader.readAsDataURL(file)
-    } catch (error) {
-      // 14. Handle unexpected errors during file reading
-      console.error('Error reading file:', error)
-      setError('An unexpected error occurred while reading the file. Please try again.')
-      setIsGenerating(false)
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ''
-      }
-    }
+    reader.readAsDataURL(file)
   }
 
   const handleUploadClick = () => {
@@ -432,8 +317,7 @@ export default function Home() {
                     ref={fileInputRef}
                     id="file-upload"
                     type="file"
-                    accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,image/bmp,image/svg+xml"
-                    multiple={false}
+                    accept="image/*"
                     onChange={handleFileUpload}
                     className="hidden"
                     disabled={isGenerating}
@@ -453,7 +337,7 @@ export default function Home() {
                     )}
                   </button>
                   <p className="text-white/60 text-sm mt-2 text-center">
-                    Supports JPEG, PNG, GIF, WebP, BMP, SVG (max 10MB, max 10,000x10,000px)
+                    Supports JPEG, PNG, GIF (max 10MB)
                   </p>
                 </div>
               )}
