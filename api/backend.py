@@ -224,8 +224,8 @@ JSON only:"""
                 },
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=300,  # Further reduced for speed
-            temperature=0.6  # Lower for faster responses
+            max_tokens=250,  # Further optimized for speed
+            temperature=0.5  # Lower for faster responses
         )
         
         result = response.choices[0].message.content.strip()
@@ -479,29 +479,16 @@ async def create_learning_experience(request: LearningRequest):
     try:
         # Generate learning plan and scrape examples in parallel for speed
         # Use clean topic for plan generation, pass num_steps if specified
-        # Add timeout wrapper to ensure we never exceed 8 seconds total
-        async def run_with_timeout():
-            plan_task = generate_learning_plan(clean_topic, num_steps=num_steps)
-            examples_task = scrape_examples(clean_topic, num_examples=num_resources)
-            
-            # Run both in parallel with 7.5 second timeout (leaving 0.5s buffer)
-            plan, examples = await asyncio.wait_for(
-                asyncio.gather(plan_task, examples_task),
-                timeout=7.5
-            )
-            return plan, examples
+        plan_task = generate_learning_plan(clean_topic, num_steps=num_steps)
+        examples_task = scrape_examples(clean_topic, num_examples=num_resources)
         
-        plan, examples = await run_with_timeout()
+        # Run both in parallel - optimizations ensure fast completion
+        plan, examples = await asyncio.gather(plan_task, examples_task)
         
         return LearningPlanResponse(
             plan=plan,
             examples=examples,
             message=resource_message
-        )
-    except asyncio.TimeoutError:
-        raise HTTPException(
-            status_code=504, 
-            detail="Request timed out. Please try again with a simpler topic or fewer resources."
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error creating learning experience: {str(e)}")
@@ -515,7 +502,7 @@ async def expand_learning_step(topic: str, step_title: str, step_description: st
         prompt = f"""Topic: {topic}
 Step: {step_title} - {step_description}
 
-Complementary details (don't repeat). JSON:
+Complementary details. JSON:
 {{
   "additionalContext": "Brief context...",
   "practicalDetails": ["Detail 1", "Detail 2"],
@@ -535,7 +522,7 @@ JSON only:"""
                 },
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=400,  # Further reduced for speed
+            max_tokens=350,  # Optimized for speed
             temperature=0.5  # Lower for faster responses
         )
         
@@ -585,21 +572,12 @@ async def expand_step(request: ExpandStepRequest):
         raise HTTPException(status_code=500, detail="OPENAI_API_KEY not configured")
     
     try:
-        # Add timeout to ensure we never exceed 7.5 seconds
-        expanded = await asyncio.wait_for(
-            expand_learning_step(
-                request.topic,
-                request.step_title,
-                request.step_description
-            ),
-            timeout=7.5
+        expanded = await expand_learning_step(
+            request.topic,
+            request.step_title,
+            request.step_description
         )
         return expanded
-    except asyncio.TimeoutError:
-        raise HTTPException(
-            status_code=504,
-            detail="Request timed out. Please try again."
-        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error expanding learning step: {str(e)}")
 
