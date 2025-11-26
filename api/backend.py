@@ -209,9 +209,17 @@ async def scrape_examples(topic: str, num_examples: int = 3) -> List[Dict[str, s
     # OPTIMIZATION: Use AI first (faster and more reliable than web scraping)
     try:
         # Use GPT to suggest relevant resources quickly
-        prompt = f"""Suggest {num_examples} resources for: {topic}
+        prompt = f"""Suggest {num_examples} specific, real learning resources for: {topic}
 
-JSON: [{{"title": "Name", "url": "https://example.com", "description": "Brief"}}, ...]
+IMPORTANT:
+- Provide ACTUAL website URLs (e.g., docs.python.org, w3schools.com, github.com, coursera.org, khanacademy.org)
+- NO Google search URLs or generic search links
+- NO placeholder URLs like "https://example.com"
+- Use real, well-known educational websites, documentation sites, tutorials, courses, or GitHub repos
+- Each resource must be a specific, useful learning destination
+
+JSON format:
+[{{"title": "Resource Name", "url": "https://actual-website.com/path", "description": "What you'll learn"}}, ...]
 
 JSON only:"""
 
@@ -220,11 +228,11 @@ JSON only:"""
             messages=[
                 {
                     "role": "system",
-                    "content": "Expert at finding learning resources. JSON only."
+                    "content": "You are an expert at finding real, specific learning resources. Always provide actual website URLs, never search URLs or placeholders. Suggest well-known educational sites, documentation, tutorials, courses, or GitHub repositories."
                 },
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=250,  # Further optimized for speed
+            max_tokens=300,  # Increased slightly to allow for better URLs
             temperature=0.5  # Lower for faster responses
         )
         
@@ -241,9 +249,18 @@ JSON only:"""
         for resource in ai_resources:
             if len(examples) >= num_examples:
                 break
+            
+            url = resource.get("url", "")
+            title = resource.get("title", f"{topic} Resource")
+            
+            # Validate URL - reject Google search URLs and placeholders
+            if not url or "google.com/search" in url.lower() or "example.com" in url.lower() or not url.startswith("http"):
+                # Skip invalid URLs - don't add fallback Google search
+                continue
+            
             examples.append({
-                "title": resource.get("title", f"{topic} Resource"),
-                "url": resource.get("url", f"https://www.google.com/search?q={topic.replace(' ', '+')}"),
+                "title": title,
+                "url": url,
                 "description": resource.get("description", f"Learn about {topic}")
             })
     except Exception as e:
@@ -306,23 +323,25 @@ JSON only:"""
         except Exception as e:
             print(f"Error in web scraping (non-critical): {e}")
     
-    # Final fallback if we still don't have enough
+    # Final fallback if we still don't have enough - use real educational sites
     if len(examples) == 0:
+        # Generate topic-specific fallback using real educational platforms
+        topic_slug = topic.replace(' ', '-').lower()
         examples = [
-            {
-                "title": f"{topic} - Search Results",
-                "url": f"https://www.google.com/search?q={topic.replace(' ', '+')}+tutorial",
-                "description": f"Find tutorials and resources about {topic}"
-            },
             {
                 "title": f"{topic} - Wikipedia",
                 "url": f"https://en.wikipedia.org/wiki/{topic.replace(' ', '_')}",
                 "description": f"Learn the basics of {topic} on Wikipedia"
             },
             {
-                "title": f"{topic} - YouTube Tutorials",
-                "url": f"https://www.youtube.com/results?search_query={topic.replace(' ', '+')}+tutorial",
-                "description": f"Watch video tutorials about {topic}"
+                "title": f"{topic} - Khan Academy",
+                "url": f"https://www.khanacademy.org/search?page_search_query={topic.replace(' ', '+')}",
+                "description": f"Free courses and tutorials on {topic}"
+            },
+            {
+                "title": f"{topic} - Coursera",
+                "url": f"https://www.coursera.org/courses?query={topic.replace(' ', '+')}",
+                "description": f"Online courses on {topic}"
             }
         ]
     
