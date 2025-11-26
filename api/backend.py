@@ -437,31 +437,8 @@ IMPORTANT: All fields must be arrays of STRINGS only. potentialChallenges should
 
 JSON only:"""
 
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {
-                    "role": "system",
-                    "content": "Expert educator. JSON only."
-                },
-                {"role": "user", "content": prompt}
-            ],
-            max_tokens=350,  # Optimized for speed
-            temperature=0.5  # Lower for faster responses
-        )
-        
-        result = response.choices[0].message.content.strip()
-        
-        # Remove markdown code blocks if present
-        if result.startswith("```json"):
-            result = result[7:]
-        if result.startswith("```"):
-            result = result[3:]
-        if result.endswith("```"):
-            result = result[:-3]
-        result = result.strip()
-        
-        expanded = json.loads(result)
+        result = call_ai(prompt, "Expert educator. JSON only.", max_tokens=350, temperature=0.5)
+        expanded = parse_json_response(result)
         
         # Ensure all array fields are arrays of strings (not objects)
         # Fix potentialChallenges if AI returned objects instead of strings
