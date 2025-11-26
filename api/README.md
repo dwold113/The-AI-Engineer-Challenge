@@ -86,7 +86,7 @@ Once the server is running, you can access the interactive API documentation at:
 
 ## CORS Configuration
 
-The API is configured to accept requests from any origin (`*`). This can be modified in the `index.py` file if you need to restrict access to specific domains.
+The API is configured to accept requests from any origin (`*`). This can be modified in the `backend.py` file if you need to restrict access to specific domains.
 
 ## Error Handling
 
