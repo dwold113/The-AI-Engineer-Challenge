@@ -117,15 +117,34 @@ function BackgroundImage({ imageUrl }: BackgroundImageProps) {
     )
   }
 
-  // Determine best fit mode based on image and screen aspect ratio
-  // Use 'cover' for generated images to fill entire screen
-  // Use 'contain' for uploaded images only when aspect ratio doesn't match screen (to prevent cropping)
+  // Smart fit mode: Use judgment to decide between 'cover' and 'contain'
+  // Use 'cover' when aspect ratios are similar (won't crop much)
+  // Use 'contain' when aspect ratios are very different (to avoid significant cropping)
   const isUploadedImage = imageUrl?.startsWith('data:')
-  const useContain = imageAspectRatio !== null && isUploadedImage && (
-    (imageAspectRatio < 1 && screenAspectRatio > 1.2) || // Portrait image on landscape screen
-    (imageAspectRatio > 1.5 && screenAspectRatio < 0.8)   // Very wide image on portrait screen
-  )
-  // Generated images always use 'cover' to fill the screen
+  
+  let useContain = false
+  
+  if (imageAspectRatio !== null) {
+    // Calculate aspect ratio difference
+    const aspectRatioDiff = Math.abs(imageAspectRatio - screenAspectRatio)
+    const ratioDifference = aspectRatioDiff / Math.max(imageAspectRatio, screenAspectRatio)
+    
+    // For generated images: always use cover (they're designed to be backgrounds)
+    if (!isUploadedImage) {
+      useContain = false
+    } else {
+      // For uploaded images: use smart judgment
+      // If aspect ratios are similar (within 30% difference), use cover
+      // If very different (more than 30% difference), use contain to avoid cropping
+      if (ratioDifference > 0.3) {
+        // Aspect ratios are very different - use contain to show full image
+        useContain = true
+      } else {
+        // Aspect ratios are similar - use cover to fill screen
+        useContain = false
+      }
+    }
+  }
 
   // Render clear, high-quality background image using img element for maximum quality
   return (
