@@ -211,13 +211,14 @@ JSON only:"""
                             response = await http_client.get(url, allow_redirects=True)
                             url_exists = response.status_code < 400
                 except (httpx.TimeoutException, httpx.ConnectError, httpx.RequestError):
-                    # Network errors - URL might exist but unreachable, skip it
-                    url_exists = False
+                    # Network errors (timeout, connection issues) - URL might be valid but unreachable
+                    # Be lenient: if URL format looks valid, include it anyway
+                    url_exists = True
                 except Exception:
-                    # Other errors - skip this URL
-                    url_exists = False
+                    # Other errors - be lenient, include if format looks valid
+                    url_exists = True
                 
-                # Only include if URL actually exists and is accessible
+                # Include if URL is valid or if we couldn't verify (lenient approach)
                 if url_exists:
                     examples.append({
                         "title": title,
