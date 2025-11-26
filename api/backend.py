@@ -80,53 +80,40 @@ def validate_prompt_makes_sense(prompt: str) -> tuple[bool, str]:
     if any(keyword in prompt_lower for keyword in gif_keywords):
         return (False, "DALL-E can only generate static images, not animated GIFs. Try describing the scene instead, like 'a boy dancing' or 'a dancing boy in motion'. You can upload your own GIF files using the 'Upload Image' option.")
     
-    # Use AI to determine if the prompt can be visualized
+    # Quick heuristic check for obviously valid prompts (skip AI validation for speed)
+    # If prompt contains visual keywords, it's likely valid - skip expensive AI call
+    visual_keywords = ['at', 'with', 'of', 'in', 'on', 'over', 'under', 'through', 'across', 'sunset', 'sunrise', 'night', 'day', 'city', 'mountain', 'ocean', 'forest', 'beach', 'sky', 'cloud', 'star', 'light', 'dark', 'color', 'abstract', 'pattern', 'scene', 'landscape', 'portrait', 'view']
+    has_visual_keywords = any(keyword in prompt_lower for keyword in visual_keywords)
+    
+    # Only use AI validation for potentially problematic prompts
+    # Skip AI validation for obviously visual prompts to save time
+    if has_visual_keywords and len(words) >= 2:
+        # Quick check for specific person names (common names that might be in prompts)
+        # This is a fast heuristic - if it passes, skip expensive AI validation
+        common_names = ['elon', 'musk', 'taylor', 'swift', 'obama', 'trump', 'biden', 'gates', 'bezos', 'zuckerberg']
+        has_name = any(name in prompt_lower for name in common_names)
+        if not has_name:
+            # Looks like a valid visual prompt - skip AI validation for speed
+            return (True, "")
+    
+    # Use fast AI validation only for edge cases
     try:
-        validation_prompt = f"""Analyze this image generation prompt step by step:
+        validation_prompt = f"""Is this a valid image prompt? "{prompt}"
 
-Prompt: "{prompt}"
+Respond ONLY:
+- "VALID" if it describes a visual scene/object (not abstract concepts or specific real people)
+- "INVALID: [reason]" if it's abstract, philosophical, or requests a specific real person
 
-Step 1: Does this describe something that can be visualized as an image?
-- Can you picture this in your mind?
-- Does it describe visual elements (objects, scenes, colors, shapes, landscapes, etc.)?
-- Or is it abstract/philosophical (concepts, ideas, emotions without visual representation)?
-
-Step 2: IMPORTANT - Check if prompt requests a specific real person:
-- Does the prompt contain a specific person's name (like "jaxson dart", "elon musk", "taylor swift")?
-- If yes, this is a problem because AI image generators cannot accurately create images of specific real people
-- Instead, suggest describing the scene without the person's name (e.g., "a quarterback running" instead of "jaxson dart running")
-
-Step 3: Examples of what CAN be visualized:
-- "a sunset over mountains" ✅ (clear visual scene)
-- "abstract geometric patterns" ✅ (visual design)
-- "a cyberpunk city at night" ✅ (describes a scene)
-- "serene forest with glowing mushrooms" ✅ (visual elements)
-- "a quarterback running on a field" ✅ (describes a scene without specific person)
-
-Step 4: Examples of what CANNOT be visualized:
-- "Open weights. Infinite possibilities" ❌ (abstract concept, no visual elements)
-- "the meaning of life" ❌ (philosophical, not visual)
-- "freedom to run anywhere" ❌ (abstract concept, not a scene)
-- "jaxson dart running" ❌ (requests specific real person - AI cannot accurately generate this)
-
-Step 5: Your analysis:
-Respond with ONLY one of these:
-- "VALID" if it can be visualized as an image AND doesn't request a specific real person
-- "INVALID: [brief explanation]" if it cannot be visualized or requests a specific real person, with a helpful suggestion
-
-Your response:"""
+Response:"""
 
         response = client.chat.completions.create(
-            model="gpt-4o-mini",  # Fast and cheap for validation
+            model="gpt-4o-mini",
             messages=[
-                {
-                    "role": "system", 
-                    "content": "You are an expert at determining if text can be visualized as an image. Use common sense and think step by step. Be strict - only approve prompts that clearly describe visual scenes, objects, or designs that can be rendered as images."
-                },
+                {"role": "system", "content": "Validate image prompts. Only approve visual scenes/objects. Reject abstract concepts or specific real people."},
                 {"role": "user", "content": validation_prompt}
             ],
-            max_tokens=100,  # Reduced for faster response
-            temperature=0.2  # Low temperature for consistent validation
+            max_tokens=30,  # Minimal tokens for fastest response
+            temperature=0.1  # Very low temperature for speed
         )
         
         result = response.choices[0].message.content.strip().upper()
@@ -183,7 +170,8 @@ async def generate_image(request: ImageRequest):
         image_url = response.data[0].url
         
         # Fetch the image asynchronously and convert to base64 to avoid CORS issues
-        async with httpx.AsyncClient(timeout=10.0) as http_client:
+        # Use shorter timeout for faster failure if image isn't ready
+        async with httpx.AsyncClient(timeout=5.0) as http_client:
             img_response = await http_client.get(image_url)
             img_response.raise_for_status()
             image_data = img_response.content
