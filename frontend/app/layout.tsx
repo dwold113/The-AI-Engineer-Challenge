@@ -2,8 +2,8 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Pixelated Background Generator',
-  description: 'Generate pixelated backgrounds from AI-generated images',
+  title: 'Learning Experience',
+  description: 'Create personalized learning plans with real examples',
 }
 
 export default function RootLayout({

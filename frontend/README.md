@@ -1,13 +1,14 @@
-# Pixelated Background Generator Frontend
+# Learning Experience Frontend
 
-A Next.js frontend application that generates pixelated backgrounds from AI-generated images using DALL-E.
+A Next.js frontend application that helps users learn about any topic by generating personalized learning plans with real examples scraped from the web.
 
 ## Features
 
-- **AI Image Generation**: Enter a prompt and generate images using OpenAI's DALL-E API
-- **Pixelated Background**: Automatically converts generated images into a cool pixelated background made of tiny squares
+- **AI Learning Plans**: Enter a topic and get a structured, step-by-step learning plan
+- **Real Examples**: Automatically finds and displays real-world resources, tutorials, and examples
+- **Expandable Steps**: Dive deeper into any learning step for additional context and details
 - **Modern UI**: Beautiful, responsive interface with smooth animations
-- **Real-time Updates**: Watch as your background pixelates in real-time
+- **Smart Validation**: AI-powered validation to ensure topics are meaningful and learnable
 
 ## Prerequisites
 
@@ -61,47 +62,31 @@ npm start
 
 1. Make sure the backend API is running (see `api/README.md`)
 2. Start the frontend development server
-3. Enter a prompt describing the image you want (e.g., "a sunset over mountains", "abstract geometric patterns")
-4. Click "Generate Pixelated Background" or press Enter
-5. Watch as the image is generated and converted into a pixelated background of tiny squares
+3. Enter a topic you want to learn about (e.g., "Python programming", "Machine Learning", "Cooking Italian food")
+4. Optionally specify number of steps and resources (e.g., "give me 3 steps and 10 examples")
+5. Click "Start Learning" or press Enter
+6. Review your personalized learning plan
+7. Click "Dive Deeper" on any step for additional context
+8. Explore the real examples and resources provided
 
 ## Project Structure
 
 ```
 frontend/
 ├── app/
-│   ├── components/
-│   │   └── PixelatedBackground.tsx  # Component that creates pixelated effect
 │   ├── globals.css                   # Global styles
 │   ├── layout.tsx                     # Root layout
-│   └── page.tsx                      # Main page with prompt input
+│   └── page.tsx                      # Main page with learning interface
 ├── package.json
 ├── tsconfig.json
 ├── next.config.js
-└── tailwind.config.js
+└── README.md
 ```
 
 ## Technologies
 
 - **Next.js 15**: React framework with App Router
-- **TypeScript**: Type-safe development
-- **Tailwind CSS**: Utility-first CSS framework
-- **OpenAI DALL-E**: AI image generation
-
-## Troubleshooting
-
-### Images not loading
-
-- Ensure the backend API is running and accessible
-- Check that `OPENAI_API_KEY` is set in the backend environment
-- Verify CORS is properly configured in the backend
-
-### Pixelation not working
-
-- Check browser console for errors
-- Ensure images are loading successfully
-- Try refreshing the page
-
-## Deployment
-
-This frontend is designed to work with Vercel. See the main README for deployment instructions.
+- **React 18**: UI library
+- **TypeScript**: Type safety
+- **Tailwind CSS**: Styling
+- **OpenAI GPT-4o-mini**: Learning plan generation and validation
