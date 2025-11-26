@@ -147,43 +147,54 @@ async def validate_url(resource: dict, topic: str) -> dict | None:
     
     # Verify URL exists with actual HTTP request
     try:
-        async with httpx.AsyncClient(timeout=3.0, follow_redirects=True) as http_client:
-            # Try GET directly (more reliable than HEAD for many sites)
+        async with httpx.AsyncClient(timeout=5.0, follow_redirects=True) as http_client:
+            # Try GET request to verify URL exists
             response = await http_client.get(url, allow_redirects=True)
             
             # Check status code - only include if 2xx (success) or 3xx (redirect)
             status = response.status_code
             if 200 <= status < 400:
-                # URL is valid and accessible
+                # URL is valid and accessible - include it
                 return {
                     "title": resource.get("title", f"{topic} Resource"),
                     "url": url,
                     "description": resource.get("description", f"Learn about {topic}")
                 }
             else:
-                # 4xx (not found, forbidden, etc.) or 5xx (server error) - URL is broken
+                # 4xx (404, 403, etc.) or 5xx (500, 503, etc.) - URL is broken, reject it
                 return None
                 
     except httpx.HTTPStatusError as e:
-        # httpx raises this for 4xx/5xx if raise_for_status is called, but we check status directly
-        # If we get here, check the status code
+        # httpx may raise this for some 4xx/5xx responses
         if hasattr(e, 'response'):
             status = e.response.status_code
             if 200 <= status < 400:
+                # Actually valid despite exception
                 return {
                     "title": resource.get("title", f"{topic} Resource"),
                     "url": url,
                     "description": resource.get("description", f"Learn about {topic}")
                 }
-        # 4xx or 5xx - broken URL, don't include
+        # 4xx or 5xx - broken URL, reject it
         return None
     except (httpx.TimeoutException, httpx.ConnectError, httpx.RequestError):
-        # Network errors - URL might be valid but slow/unreachable
-        # Don't include if we can't verify (strict approach)
-        return None
-    except Exception:
-        # Other errors - can't verify, don't include
-        return None
+        # Network errors (timeout, connection issues) - URL might be valid but slow/unreachable from server
+        # Include it anyway - it might work for users even if our server can't reach it
+        # Better to show potentially working links than no links at all
+        return {
+            "title": resource.get("title", f"{topic} Resource"),
+            "url": url,
+            "description": resource.get("description", f"Learn about {topic}")
+        }
+    except Exception as e:
+        # Other unexpected errors - include it to be safe
+        # We'd rather show a link that might work than block everything
+        print(f"Unexpected error validating URL {url}: {e}")
+        return {
+            "title": resource.get("title", f"{topic} Resource"),
+            "url": url,
+            "description": resource.get("description", f"Learn about {topic}")
+        }
 
 async def generate_plan_and_resources(topic: str, num_steps: int = None, num_examples: int = 5) -> tuple[List[Dict[str, str]], List[Dict[str, str]]]:
     """
