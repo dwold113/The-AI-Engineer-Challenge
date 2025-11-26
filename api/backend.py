@@ -359,22 +359,6 @@ def extract_topic_and_num_resources(topic: str) -> tuple[str, int, str, int]:
             except ValueError:
                 continue
     
-    for pattern in patterns:
-        match = re.search(pattern, topic.lower())
-        if match:
-            try:
-                requested_num = int(match.group(1))
-                # Remove the resource request part from the topic
-                topic = re.sub(pattern, '', topic, flags=re.IGNORECASE).strip()
-                # Clean up common phrases
-                topic = re.sub(r'\s*can\s+you\s+give\s+me\s*', '', topic, flags=re.IGNORECASE).strip()
-                topic = re.sub(r'\s*i\s+can\s+start\s+with\s*', '', topic, flags=re.IGNORECASE).strip()
-                topic = re.sub(r'\s*to\s+start\s*$', '', topic, flags=re.IGNORECASE).strip()
-                topic = re.sub(r'\s*to\s+begin\s*$', '', topic, flags=re.IGNORECASE).strip()
-                break
-            except ValueError:
-                continue
-    
     # Clean up the topic: remove trailing punctuation, extra spaces
     topic = re.sub(r'[.,;:]+$', '', topic).strip()
     topic = re.sub(r'\s+', ' ', topic)
