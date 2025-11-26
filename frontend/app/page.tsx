@@ -21,10 +21,11 @@ interface LearningResponse {
 }
 
 interface ExpandedStep {
-  subSteps: Array<{ title: string; description: string }>
-  detailedExplanation: string
-  tips: string[]
-  commonMistakes: string[]
+  additionalContext?: string
+  practicalDetails?: string[]
+  importantConsiderations?: string[]
+  realWorldExamples?: string[]
+  potentialChallenges?: string[]
 }
 
 export default function Home() {
@@ -288,51 +289,68 @@ export default function Home() {
                           {/* Expanded Content */}
                           {isExpanded && expandedSteps[index] && (
                             <div className="mt-6 pt-6 border-t border-white/10 animate-fade-in space-y-6">
-                              {/* Detailed Explanation */}
-                              <div>
-                                <h4 className="text-lg font-semibold text-blue-300 mb-2">📚 Detailed Explanation</h4>
-                                <p className="text-gray-300 leading-relaxed">{expandedSteps[index].detailedExplanation}</p>
-                              </div>
-
-                              {/* Sub-Steps */}
-                              {expandedSteps[index].subSteps && expandedSteps[index].subSteps.length > 0 && (
+                              {/* Additional Context */}
+                              {expandedSteps[index].additionalContext && (
                                 <div>
-                                  <h4 className="text-lg font-semibold text-blue-300 mb-3">🎯 Sub-Steps</h4>
-                                  <div className="space-y-3">
-                                    {expandedSteps[index].subSteps.map((subStep, subIndex) => (
-                                      <div key={subIndex} className="bg-white/5 rounded-lg p-4 border border-white/10">
-                                        <h5 className="font-semibold text-purple-200 mb-1">{subStep.title}</h5>
-                                        <p className="text-sm text-gray-400">{subStep.description}</p>
-                                      </div>
-                                    ))}
-                                  </div>
+                                  <h4 className="text-lg font-semibold text-blue-300 mb-2">💭 Additional Context</h4>
+                                  <p className="text-gray-300 leading-relaxed">{expandedSteps[index].additionalContext}</p>
                                 </div>
                               )}
 
-                              {/* Tips */}
-                              {expandedSteps[index].tips && expandedSteps[index].tips.length > 0 && (
+                              {/* Practical Details */}
+                              {expandedSteps[index].practicalDetails && expandedSteps[index].practicalDetails!.length > 0 && (
                                 <div>
-                                  <h4 className="text-lg font-semibold text-blue-300 mb-3">💡 Tips & Best Practices</h4>
+                                  <h4 className="text-lg font-semibold text-blue-300 mb-3">🔧 Practical Implementation Details</h4>
                                   <ul className="space-y-2">
-                                    {expandedSteps[index].tips.map((tip, tipIndex) => (
-                                      <li key={tipIndex} className="flex items-start gap-2 text-gray-300">
+                                    {expandedSteps[index].practicalDetails!.map((detail, detailIndex) => (
+                                      <li key={detailIndex} className="flex items-start gap-2 text-gray-300">
                                         <span className="text-purple-400 mt-1">•</span>
-                                        <span>{tip}</span>
+                                        <span>{detail}</span>
                                       </li>
                                     ))}
                                   </ul>
                                 </div>
                               )}
 
-                              {/* Common Mistakes */}
-                              {expandedSteps[index].commonMistakes && expandedSteps[index].commonMistakes.length > 0 && (
+                              {/* Important Considerations */}
+                              {expandedSteps[index].importantConsiderations && expandedSteps[index].importantConsiderations!.length > 0 && (
                                 <div>
-                                  <h4 className="text-lg font-semibold text-blue-300 mb-3">⚠️ Common Mistakes to Avoid</h4>
+                                  <h4 className="text-lg font-semibold text-blue-300 mb-3">⚠️ Important Considerations</h4>
                                   <ul className="space-y-2">
-                                    {expandedSteps[index].commonMistakes.map((mistake, mistakeIndex) => (
-                                      <li key={mistakeIndex} className="flex items-start gap-2 text-gray-300">
-                                        <span className="text-red-400 mt-1">•</span>
-                                        <span>{mistake}</span>
+                                    {expandedSteps[index].importantConsiderations!.map((consideration, considerationIndex) => (
+                                      <li key={considerationIndex} className="flex items-start gap-2 text-gray-300">
+                                        <span className="text-yellow-400 mt-1">•</span>
+                                        <span>{consideration}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+
+                              {/* Real-World Examples */}
+                              {expandedSteps[index].realWorldExamples && expandedSteps[index].realWorldExamples!.length > 0 && (
+                                <div>
+                                  <h4 className="text-lg font-semibold text-blue-300 mb-3">🌍 Real-World Applications</h4>
+                                  <ul className="space-y-2">
+                                    {expandedSteps[index].realWorldExamples!.map((example, exampleIndex) => (
+                                      <li key={exampleIndex} className="flex items-start gap-2 text-gray-300">
+                                        <span className="text-green-400 mt-1">•</span>
+                                        <span>{example}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+
+                              {/* Potential Challenges */}
+                              {expandedSteps[index].potentialChallenges && expandedSteps[index].potentialChallenges!.length > 0 && (
+                                <div>
+                                  <h4 className="text-lg font-semibold text-blue-300 mb-3">🚧 Potential Challenges & Solutions</h4>
+                                  <ul className="space-y-2">
+                                    {expandedSteps[index].potentialChallenges!.map((challenge, challengeIndex) => (
+                                      <li key={challengeIndex} className="flex items-start gap-2 text-gray-300">
+                                        <span className="text-orange-400 mt-1">•</span>
+                                        <span>{challenge}</span>
                                       </li>
                                     ))}
                                   </ul>
