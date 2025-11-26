@@ -323,10 +323,14 @@ Perform these tasks in one response:
    - Not gibberish or random characters
    - Not abstract philosophical concepts
    - Not too vague
-   - NOT about a specific real person (e.g., "donald trump", "elon musk", "taylor swift")
-     → Learning plans should be for skills, subjects, or concepts, not personal biographies
-     → If about a person, suggest learning about their field/domain instead (e.g., "business strategy" instead of "donald trump")
+   - CRITICAL: NOT about a specific real person (politicians, celebrities, public figures, historical figures, etc.)
+     → Examples to REJECT: "donald trump", "barack obama", "barak obama", "elon musk", "taylor swift", "albert einstein", "steve jobs"
+     → Learning plans should be for SKILLS, SUBJECTS, or CONCEPTS, not personal biographies or people
+     → If the input is a person's name (even with typos), set is_valid to false
+     → If about a person, suggest learning about their field/domain instead (e.g., "business strategy" instead of "donald trump", "public speaking" instead of "barack obama")
 5. If a resource number was requested, determine if it's reasonable (3-15 is reasonable)
+
+IMPORTANT: If the input appears to be a person's name (first name + last name pattern, or a well-known single name), you MUST reject it and provide a helpful alternative suggestion.
 
 Respond in JSON format:
 {{
@@ -334,7 +338,7 @@ Respond in JSON format:
   "num_resources": number or null,
   "num_steps": number or null,
   "is_valid": true/false,
-  "validation_message": "error message if invalid, empty if valid. If about a person, suggest learning the skill/domain instead.",
+  "validation_message": "error message if invalid, empty if valid. If about a person, suggest learning the skill/domain instead (e.g., 'Try learning about public speaking, leadership, or political science instead').",
   "resource_message": "message if resource count was adjusted, empty otherwise"
 }}
 
@@ -342,7 +346,7 @@ JSON only:"""
 
         result = call_ai(
             combined_prompt,
-            "Expert at extracting and validating learning topics. Extract topic and numbers, validate topic quality, and validate number reasonableness. Reject topics about specific real people - suggest learning skills or domains instead. Use common sense.",
+            "Expert at extracting and validating learning topics. You MUST reject any topic that is a specific real person's name (politicians, celebrities, public figures, historical figures). Learning plans are for skills, subjects, and concepts only - never for people. If you detect a person's name, reject it and suggest learning their field/domain instead. Be strict about this rule.",
             max_tokens=200,
             temperature=0.1
         )
