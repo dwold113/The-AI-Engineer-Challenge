@@ -20,17 +20,13 @@
    - Generates learning resources/examples
    - Always called (runs in parallel with #3)
 
-### Additional Conditional Calls: **+1 to +3 calls**
+### Additional Conditional Calls: **+0 to +2 calls**
 
 5. **Resource count validation** - 0-1 call
    - Only if user requests specific number of resources (e.g., "give me 10 resources")
    - Validates if the requested number is reasonable
 
-6. **Step count validation** - 0-1 call
-   - Only if user requests specific number of steps (e.g., "give me 3 steps")
-   - Validates if the requested number is reasonable
-
-7. **Fallback resources** - 0-1 call
+6. **Fallback resources** - 0-1 call
    - Only if initial resource generation fails or doesn't provide enough examples
    - Generates fallback educational resources
 
@@ -45,14 +41,25 @@
 **Typical Request (no number requests):**
 - **4 AI calls** (all run in parallel where possible)
 
-**Request with number specifications:**
-- **5-6 AI calls** (4 base + 1-2 validation calls)
+**Request with resource number specification:**
+- **5 AI calls** (4 base + 1 validation call)
 
 **Request with fallback needed:**
 - **5 AI calls** (4 base + 1 fallback)
 
 **Maximum possible:**
-- **7 AI calls** (4 base + 2 validations + 1 fallback)
+- **6 AI calls** (4 base + 1 validation + 1 fallback)
+
+## Call Flow
+
+```
+User Request → extract_topic_and_num_resources (1 call)
+             → validate_learning_topic (1 call)
+             → generate_learning_plan (1 call) ─┐
+             → scrape_examples (1 call) ────────┼─ Parallel execution
+             → [if needed] resource validation (0-1 call)
+             → [if needed] fallback resources (0-1 call)
+```
 
 ## Optimization Notes
 
