@@ -56,6 +56,7 @@ export default function Home() {
     setIsLoading(true)
     setError(null)
     setLearningData(null)
+    setExpandedSteps({}) // Clear expanded steps when starting a new search
 
     try {
       const response = await fetch(`${API_URL}/api/learn`, {
