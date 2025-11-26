@@ -129,12 +129,21 @@ async def scrape_examples(topic: str, num_examples: int = 3) -> List[Dict[str, s
                 url = result.get('href', '')
                 
                 # Clean up DuckDuckGo redirect URLs
-                if url.startswith('/l/?kh='):
+                if url.startswith('/l/?kh=') or 'uddg=' in url:
                     # Extract actual URL from DuckDuckGo redirect
                     try:
-                        actual_url = url.split('uddg=')[1].split('&')[0] if 'uddg=' in url else url
-                        actual_url = httpx.URL(actual_url).decode() if '%' in actual_url else actual_url
-                    except:
+                        if 'uddg=' in url:
+                            # Parse the redirect URL to get the actual destination
+                            parts = url.split('uddg=')
+                            if len(parts) > 1:
+                                encoded_url = parts[1].split('&')[0]
+                                actual_url = unquote(encoded_url)
+                            else:
+                                actual_url = url
+                        else:
+                            actual_url = url
+                    except Exception as e:
+                        print(f"Error parsing URL: {e}")
                         actual_url = url
                 else:
                     actual_url = url
