@@ -1,12 +1,14 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
 from pydantic import BaseModel
 from openai import OpenAI
 import os
 import httpx
-import base64
+import asyncio
 from dotenv import load_dotenv
+from bs4 import BeautifulSoup
+from typing import List, Dict
+import json
 
 load_dotenv()
 
@@ -22,165 +24,223 @@ app.add_middleware(
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-class ChatRequest(BaseModel):
-    message: str
+class LearningRequest(BaseModel):
+    topic: str
 
-class ImageRequest(BaseModel):
-    prompt: str
+class LearningPlanResponse(BaseModel):
+    plan: List[Dict[str, str]]
+    examples: List[Dict[str, str]]
 
 @app.get("/")
 def root():
-    # Debug endpoint to check if environment variable is set (remove in production)
+    # Debug endpoint to check if environment variable is set
     api_key_set = bool(os.getenv("OPENAI_API_KEY"))
     return {
         "status": "ok",
         "openai_api_key_configured": api_key_set,
-        "note": "Remove this debug info in production"
+        "app": "Learning Experience App"
     }
+
+async def generate_learning_plan(topic: str) -> List[Dict[str, str]]:
+    """
+    Use GPT to generate a structured learning plan for the given topic.
+    Returns a list of steps with titles and descriptions.
+    """
+    try:
+        prompt = f"""Create a step-by-step learning plan for someone who wants to learn about: {topic}
+
+Provide a practical, actionable plan with 5-7 steps. For each step, include:
+- A clear title
+- A detailed description of what to do
+- Why this step is important
+
+Format your response as a JSON array of objects, each with "title" and "description" fields.
+Example format:
+[
+  {{"title": "Step 1: Understand the Basics", "description": "Start by learning the fundamental concepts..."}},
+  {{"title": "Step 2: Practice with Examples", "description": "Find real-world examples and try them yourself..."}}
+]
+
+Your response (JSON only, no markdown):"""
+
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are an expert educator who creates clear, practical learning plans. Always respond with valid JSON only."
+                },
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=1000,
+            temperature=0.7
+        )
+        
+        result = response.choices[0].message.content.strip()
+        
+        # Remove markdown code blocks if present
+        if result.startswith("```json"):
+            result = result[7:]
+        if result.startswith("```"):
+            result = result[3:]
+        if result.endswith("```"):
+            result = result[:-3]
+        result = result.strip()
+        
+        plan = json.loads(result)
+        return plan
+    except Exception as e:
+        print(f"Error generating learning plan: {e}")
+        # Fallback to a simple plan structure
+        return [
+            {"title": f"Step 1: Research {topic}", "description": f"Start by researching the basics of {topic} online."},
+            {"title": f"Step 2: Find Examples", "description": f"Look for real-world examples of {topic} to understand practical applications."},
+            {"title": f"Step 3: Practice", "description": f"Try applying what you've learned about {topic} through hands-on practice."}
+        ]
+
+async def scrape_examples(topic: str, num_examples: int = 3) -> List[Dict[str, str]]:
+    """
+    Scrape the web to find real examples related to the learning topic.
+    Uses DuckDuckGo search to find relevant articles, tutorials, or resources.
+    """
+    examples = []
+    
+    try:
+        # Use DuckDuckGo HTML search (no API key needed)
+        search_query = f"{topic} examples tutorial guide"
+        search_url = f"https://html.duckduckgo.com/html/?q={search_query.replace(' ', '+')}"
+        
+        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as http_client:
+            # Set headers to appear as a browser
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+            }
+            
+            response = await http_client.get(search_url, headers=headers)
+            response.raise_for_status()
+            
+            soup = BeautifulSoup(response.text, 'lxml')
+            
+            # Find search result links
+            results = soup.find_all('a', class_='result__a', limit=num_examples)
+            
+            for result in results:
+                title = result.get_text(strip=True)
+                url = result.get('href', '')
+                
+                # Clean up DuckDuckGo redirect URLs
+                if url.startswith('/l/?kh='):
+                    # Extract actual URL from DuckDuckGo redirect
+                    try:
+                        actual_url = url.split('uddg=')[1].split('&')[0] if 'uddg=' in url else url
+                        actual_url = httpx.URL(actual_url).decode() if '%' in actual_url else actual_url
+                    except:
+                        actual_url = url
+                else:
+                    actual_url = url
+                
+                if title and actual_url:
+                    examples.append({
+                        "title": title,
+                        "url": actual_url,
+                        "description": f"Learn more about {topic} with this resource"
+                    })
+        
+        # If we didn't get enough examples, try a different approach
+        if len(examples) < num_examples:
+            # Use a simpler search approach
+            try:
+                # Try searching for GitHub examples, tutorials, etc.
+                github_query = f"{topic} examples site:github.com"
+                github_url = f"https://html.duckduckgo.com/html/?q={github_query.replace(' ', '+')}"
+                
+                async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as http_client:
+                    headers = {
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                    }
+                    response = await http_client.get(github_url, headers=headers)
+                    soup = BeautifulSoup(response.text, 'lxml')
+                    results = soup.find_all('a', class_='result__a', limit=num_examples - len(examples))
+                    
+                    for result in results:
+                        title = result.get_text(strip=True)
+                        url = result.get('href', '')
+                        if title and url and len(examples) < num_examples:
+                            examples.append({
+                                "title": title,
+                                "url": url,
+                                "description": f"Real-world example of {topic}"
+                            })
+            except Exception as e:
+                print(f"Error in secondary search: {e}")
+        
+    except Exception as e:
+        print(f"Error scraping examples: {e}")
+        # Return fallback examples
+        examples = [
+            {
+                "title": f"{topic} - Wikipedia",
+                "url": f"https://en.wikipedia.org/wiki/{topic.replace(' ', '_')}",
+                "description": f"Learn the basics of {topic} on Wikipedia"
+            },
+            {
+                "title": f"{topic} Tutorial",
+                "url": f"https://www.google.com/search?q={topic.replace(' ', '+')}+tutorial",
+                "description": f"Find tutorials about {topic}"
+            }
+        ]
+    
+    return examples[:num_examples]
+
+@app.post("/api/learn", response_model=LearningPlanResponse)
+async def create_learning_experience(request: LearningRequest):
+    """
+    Main endpoint: Takes a learning topic and returns:
+    1. A structured learning plan (generated by GPT)
+    2. Real examples scraped from the web
+    """
+    if not os.getenv("OPENAI_API_KEY"):
+        raise HTTPException(status_code=500, detail="OPENAI_API_KEY not configured")
+    
+    topic = request.topic.strip()
+    if len(topic) < 3:
+        raise HTTPException(status_code=400, detail="Topic is too short. Please provide more details.")
+    if len(topic) > 200:
+        raise HTTPException(status_code=400, detail="Topic is too long. Please keep it under 200 characters.")
+    
+    try:
+        # Generate learning plan and scrape examples in parallel for speed
+        plan_task = generate_learning_plan(topic)
+        examples_task = scrape_examples(topic, num_examples=5)
+        
+        plan, examples = await asyncio.gather(plan_task, examples_task)
+        
+        return LearningPlanResponse(
+            plan=plan,
+            examples=examples
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error creating learning experience: {str(e)}")
+
+# Keep old endpoints for backward compatibility (can remove later)
+class ChatRequest(BaseModel):
+    message: str
 
 @app.post("/api/chat")
 def chat(request: ChatRequest):
+    """Legacy chat endpoint - kept for compatibility"""
     if not os.getenv("OPENAI_API_KEY"):
         raise HTTPException(status_code=500, detail="OPENAI_API_KEY not configured")
     
     try:
         user_message = request.message
         response = client.chat.completions.create(
-            model="gpt-5",
+            model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "You are a supportive helper"},
-                {"role": "developer", "content": "You are able to use common sense and determine if the prompt should be generated"},
+                {"role": "system", "content": "You are a helpful learning assistant"},
                 {"role": "user", "content": user_message}
             ]
         )
         return {"reply": response.choices[0].message.content}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error calling OpenAI API: {str(e)}")
-
-def validate_prompt_makes_sense(prompt: str) -> tuple[bool, str]:
-    """
-    Use AI to determine if a prompt can be visualized as an image.
-    Uses common sense to check if the phrase describes something that can be pictured.
-    Returns (is_valid, message)
-    """
-    prompt_lower = prompt.lower().strip()
-    words = prompt_lower.split()
-    
-    # Quick sanity checks (no API call needed)
-    if len(words) < 2:
-        return (False, "Please provide more details about what you want to see.")
-    
-    # Check for repeated characters or obvious nonsense
-    if len(set(prompt_lower.replace(' ', ''))) < 3:
-        return (False, "Please provide a meaningful description, not just repeated characters.")
-    
-    # Use AI to validate the prompt - it will intelligently catch all edge cases
-    # No hardcoded keyword lists - AI handles copyrighted content, GIF requests, specific people, etc.
-    try:
-        validation_prompt = f"""Analyze this image generation prompt: "{prompt}"
-
-Check for these issues:
-1. Abstract/philosophical concepts (e.g., "freedom", "the meaning of life")
-2. Specific real people (e.g., "jaxson dart", "elon musk", "taylor swift")
-3. Copyrighted/trademarked content (e.g., "marvel", "disney", "star wars", specific superhero names)
-4. Animated/GIF requests (e.g., "gif of", "animated", "moving video")
-
-Respond ONLY:
-- "VALID" if it's a visual scene/object without the above issues
-- "INVALID: [specific reason and helpful suggestion]" if it has any of the above issues
-
-Response:"""
-
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {
-                    "role": "system", 
-                    "content": "You are an expert at validating image generation prompts. Check for abstract concepts, specific real people, copyrighted content, and animation requests. Provide helpful suggestions when rejecting prompts."
-                },
-                {"role": "user", "content": validation_prompt}
-            ],
-            max_tokens=50,  # Enough for reason + suggestion
-            temperature=0.1  # Low temperature for consistent validation
-        )
-        
-        result = response.choices[0].message.content.strip().upper()
-        
-        if result.startswith("VALID"):
-            return (True, "")
-        elif result.startswith("INVALID"):
-            # Extract the explanation
-            explanation = result.replace("INVALID", "").strip()
-            if explanation.startswith(":"):
-                explanation = explanation[1:].strip()
-            return (False, explanation if explanation else "This doesn't describe a visual scene. Please describe what you want to see, like 'a sunset over mountains' or 'abstract geometric patterns'.")
-        else:
-            # If response format is unexpected, be conservative and allow it
-            # Let DALL-E decide if it can generate it
-            return (True, "")
-            
-    except Exception as e:
-        # If AI validation fails, be lenient and allow the prompt
-        # Better to let DALL-E try than to block valid prompts
-        print(f"Validation error: {e}")
-        return (True, "")
-
-@app.post("/api/generate-image")
-async def generate_image(request: ImageRequest):
-    if not os.getenv("OPENAI_API_KEY"):
-        raise HTTPException(status_code=500, detail="OPENAI_API_KEY not configured")
-    
-    # Basic prompt validation
-    prompt = request.prompt.strip()
-    if len(prompt) < 3:
-        raise HTTPException(status_code=400, detail="Prompt is too short. Please provide more details.")
-    if len(prompt) > 1000:
-        raise HTTPException(status_code=400, detail="Prompt is too long. Please keep it under 1000 characters.")
-    
-    # Fast validation to check if prompt makes sense
-    is_valid, validation_message = validate_prompt_makes_sense(prompt)
-    if not is_valid:
-        raise HTTPException(
-            status_code=400,
-            detail=validation_message or "This prompt doesn't clearly describe a visual scene. Please provide more details about what background you want to see."
-        )
-    
-    try:
-        # Use standard quality for fastest generation (under 10 seconds)
-        # Standard quality is still high quality but generates much faster than HD
-        response = client.images.generate(
-            model="dall-e-3",
-            prompt=prompt,
-            size="1024x1024",  # Smallest size for fastest generation
-            quality="standard",  # Standard quality for speed (still high quality)
-            n=1,
-        )
-        image_url = response.data[0].url
-        
-        # Fetch the image asynchronously and convert to base64 to avoid CORS issues
-        # Use shorter timeout for faster failure if image isn't ready
-        async with httpx.AsyncClient(timeout=5.0) as http_client:
-            img_response = await http_client.get(image_url)
-            img_response.raise_for_status()
-            image_data = img_response.content
-            image_base64 = base64.b64encode(image_data).decode('utf-8')
-            image_data_url = f"data:image/png;base64,{image_base64}"
-        
-        return {"image_url": image_data_url}
-    except Exception as e:
-        error_str = str(e).lower()
-        # Check for content policy violations
-        if 'content_policy' in error_str or 'safety' in error_str or 'policy' in error_str:
-            raise HTTPException(
-                status_code=400, 
-                detail="This prompt may violate content policies. Please try a different, more appropriate description."
-            )
-        # Check for invalid prompts
-        if 'invalid' in error_str or 'malformed' in error_str:
-            raise HTTPException(
-                status_code=400,
-                detail="The prompt doesn't make sense or is invalid. Please provide a clearer description of the background you want."
-            )
-        # Note: DALL-E may generate images for prompts with specific people, but they won't be accurate
-        # The validation step should catch these, but if it gets through, we let DALL-E try
-        raise HTTPException(status_code=500, detail=f"Error generating image: {str(e)}")
