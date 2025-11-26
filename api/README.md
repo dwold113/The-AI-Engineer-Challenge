@@ -31,7 +31,7 @@ source .venv/bin/activate  # Windows: .venv\Scripts\activate
 Start the FastAPI app with the dependencies managed by `uv`:
 
 ```bash
-uv run uvicorn api.index:app --reload
+uv run uvicorn api.backend:app --reload
 ```
 
 This runs the app with `uvicorn` on `http://localhost:8000` with auto-reload enabled for development. The server will automatically restart when you make changes to the code.
