@@ -47,6 +47,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
   const [mode, setMode] = useState<'generate' | 'upload'>('generate')
+  const [isInputFocused, setIsInputFocused] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -285,9 +286,15 @@ export default function Home() {
                       setPrompt(e.target.value)
                       setError(null) // Clear error when user types
                     }}
+                    onFocus={() => setIsInputFocused(true)}
+                    onBlur={() => setIsInputFocused(false)}
                     onKeyPress={handleKeyPress}
                     placeholder="Describe your ideal background... Try: 'serene mountain landscape at sunset', 'futuristic cityscape with neon lights', 'tropical beach with palm trees', 'cozy coffee shop interior'..."
-                    className="w-full px-5 py-4 rounded-lg bg-white/10 text-white placeholder-white/40 border border-white/20 focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-transparent transition-all text-lg"
+                    className={`w-full px-5 py-4 rounded-lg text-white placeholder-white/40 border border-white/20 focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-transparent transition-all text-lg ${
+                      imageUrl && !isInputFocused && !prompt.trim()
+                        ? 'bg-transparent backdrop-blur-sm'
+                        : 'bg-white/10'
+                    }`}
                     disabled={isGenerating}
                   />
                   <button
