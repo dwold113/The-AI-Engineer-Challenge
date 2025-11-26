@@ -293,7 +293,7 @@ export default function Home() {
                     className={`w-full px-5 py-4 rounded-lg text-white placeholder-white/40 border border-white/20 focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-transparent transition-all text-lg ${
                       imageUrl && !isInputFocused && !prompt.trim()
                         ? 'bg-transparent backdrop-blur-sm'
-                        : 'bg-white/10'
+                        : 'bg-white/10 backdrop-blur-sm'
                     }`}
                     disabled={isGenerating}
                   />
