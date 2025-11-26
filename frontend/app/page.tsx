@@ -238,7 +238,7 @@ export default function Home() {
             AI Background Generator
           </h1>
           
-          <div className="bg-black/80 backdrop-blur-md rounded-xl p-8 shadow-2xl border border-white/10 animate-fade-in">
+          <div className="bg-black/20 backdrop-blur-md rounded-xl p-8 shadow-2xl border border-white/20 animate-fade-in">
             <div className="flex flex-col gap-5">
               {/* Mode Toggle */}
               <div className="flex gap-2 mb-2">

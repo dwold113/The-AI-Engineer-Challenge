@@ -112,7 +112,7 @@ Your response:"""
                 },
                 {"role": "user", "content": validation_prompt}
             ],
-            max_tokens=150,
+            max_tokens=100,  # Reduced for faster response
             temperature=0.2  # Low temperature for consistent validation
         )
         
@@ -158,12 +158,13 @@ async def generate_image(request: ImageRequest):
         )
     
     try:
-        # Use smallest HD size for fastest generation while maintaining highest quality
+        # Use standard quality for fastest generation (under 10 seconds)
+        # Standard quality is still high quality but generates much faster than HD
         response = client.images.generate(
             model="dall-e-3",
             prompt=prompt,
             size="1024x1024",  # Smallest size for fastest generation
-            quality="hd",  # HD quality for highest image clarity
+            quality="standard",  # Standard quality for speed (still high quality)
             n=1,
         )
         image_url = response.data[0].url
