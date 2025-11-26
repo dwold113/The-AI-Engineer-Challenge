@@ -158,32 +158,25 @@ async def generate_learning_plan(topic: str, num_steps: int = None) -> List[Dict
             step_count = str(num_steps)
             step_instruction = f"Provide exactly {num_steps} steps. Make sure the plan is comprehensive but fits within {num_steps} steps."
         
-        prompt = f"""Create a step-by-step learning plan for someone who wants to learn about: {topic}
+        prompt = f"""Create a learning plan for: {topic}
 
-{step_instruction} For each step, include:
-- A clear title
-- A detailed description of what to do
-- Why this step is important
+{step_instruction} Format as JSON array with "title" and "description" fields.
 
-Format your response as a JSON array of objects, each with "title" and "description" fields.
-Example format:
-[
-  {{"title": "Step 1: Understand the Basics", "description": "Start by learning the fundamental concepts..."}},
-  {{"title": "Step 2: Practice with Examples", "description": "Find real-world examples and try them yourself..."}}
-]
+Example:
+[{{"title": "Step 1: Basics", "description": "Learn fundamentals..."}}, {{"title": "Step 2: Practice", "description": "Try examples..."}}]
 
-Your response (JSON only, no markdown):"""
+JSON only:"""
 
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
                 {
                     "role": "system",
-                    "content": "You are an expert educator who creates clear, practical learning plans. Always respond with valid JSON only."
+                    "content": "You are an expert educator. Respond with valid JSON only."
                 },
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=1000,
+            max_tokens=800,  # Reduced from 1000 for speed
             temperature=0.7
         )
         
@@ -211,77 +204,75 @@ Your response (JSON only, no markdown):"""
 
 async def scrape_examples(topic: str, num_examples: int = 3) -> List[Dict[str, str]]:
     """
-    Scrape the web to find real examples related to the learning topic.
-    Uses multiple strategies to find relevant articles, tutorials, or resources.
+    Generate learning resources using AI (fast and reliable).
+    Falls back to web scraping only if AI fails.
     """
     examples = []
     
-    # Try multiple search strategies
-    search_strategies = [
-        # Strategy 1: DuckDuckGo HTML search
-        {
-            "query": f"{topic} tutorial guide examples",
-            "url": f"https://html.duckduckgo.com/html/?q={topic.replace(' ', '+')}+tutorial+guide",
-            "selectors": [
-                ('a', {'class': 'result__a'}),
-                ('a', {'class': 'result-link'}),
-                ('a', {'class': 'web-result'}),
-                ('a', {'href': lambda x: x and x.startswith('/l/?')}),
-            ]
-        },
-        # Strategy 2: GitHub search
-        {
-            "query": f"{topic} site:github.com",
-            "url": f"https://html.duckduckgo.com/html/?q={topic.replace(' ', '+')}+site%3Agithub.com",
-            "selectors": [
-                ('a', {'class': 'result__a'}),
-                ('a', {'href': lambda x: x and 'github.com' in x}),
-            ]
-        },
-        # Strategy 3: General web search
-        {
-            "query": f"{topic} examples",
-            "url": f"https://html.duckduckgo.com/html/?q={topic.replace(' ', '+')}+examples",
-            "selectors": [
-                ('a', {'class': 'result__a'}),
-                ('a', {'class': 'result-link'}),
-            ]
-        }
-    ]
+    # OPTIMIZATION: Use AI first (faster and more reliable than web scraping)
+    try:
+        # Use GPT to suggest relevant resources quickly
+        prompt = f"""Suggest {num_examples} specific, real online resources for learning: {topic}
+
+For each, provide:
+- Website/tool name
+- Realistic URL (can be search URL if specific unknown)
+- Brief description
+
+JSON array format:
+[{{"title": "Name", "url": "https://example.com", "description": "Brief"}}, ...]
+
+JSON only, no markdown:"""
+
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are an expert at finding learning resources. Suggest real, specific websites, tutorials, courses, or documentation."
+                },
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=400,  # Reduced from 500 for speed
+            temperature=0.7
+        )
+        
+        result = response.choices[0].message.content.strip()
+        if result.startswith("```json"):
+            result = result[7:]
+        if result.startswith("```"):
+            result = result[3:]
+        if result.endswith("```"):
+            result = result[:-3]
+        result = result.strip()
+        
+        ai_resources = json.loads(result)
+        for resource in ai_resources:
+            if len(examples) >= num_examples:
+                break
+            examples.append({
+                "title": resource.get("title", f"{topic} Resource"),
+                "url": resource.get("url", f"https://www.google.com/search?q={topic.replace(' ', '+')}"),
+                "description": resource.get("description", f"Learn about {topic}")
+            })
+    except Exception as e:
+        print(f"Error generating AI resources: {e}")
     
-    for strategy in search_strategies:
-        if len(examples) >= num_examples:
-            break
-            
+    # Only try web scraping if we don't have enough examples (quick single attempt)
+    if len(examples) < num_examples:
         try:
-            async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as http_client:
+            # Single quick web scraping attempt (reduced timeout)
+            async with httpx.AsyncClient(timeout=3.0, follow_redirects=True) as http_client:
                 headers = {
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                    "Accept-Language": "en-US,en;q=0.5",
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
                 }
                 
-                response = await http_client.get(strategy["url"], headers=headers)
+                search_url = f"https://html.duckduckgo.com/html/?q={topic.replace(' ', '+')}+tutorial"
+                response = await http_client.get(search_url, headers=headers)
                 response.raise_for_status()
                 
                 soup = BeautifulSoup(response.text, 'lxml')
-                
-                # Try different selectors
-                results = []
-                for selector, attrs in strategy["selectors"]:
-                    found = soup.find_all(selector, attrs, limit=num_examples * 2)
-                    if found:
-                        results = found
-                        break
-                
-                # If no results with class selectors, try finding links in result containers
-                if not results:
-                    # Look for result containers and find links within them
-                    result_containers = soup.find_all(['div', 'article', 'section'], class_=lambda x: x and ('result' in str(x).lower() or 'web' in str(x).lower()))
-                    for container in result_containers[:num_examples * 2]:
-                        link = container.find('a', href=True)
-                        if link:
-                            results.append(link)
+                results = soup.find_all('a', class_='result__a', limit=num_examples - len(examples))
                 
                 for result in results:
                     if len(examples) >= num_examples:
@@ -293,10 +284,6 @@ async def scrape_examples(topic: str, num_examples: int = 3) -> List[Dict[str, s
                     if not title or not url:
                         continue
                     
-                    # Skip internal DuckDuckGo links
-                    if url.startswith('/') and not url.startswith('/l/?'):
-                        continue
-                    
                     # Clean up DuckDuckGo redirect URLs
                     if url.startswith('/l/?') or 'uddg=' in url:
                         try:
@@ -304,98 +291,29 @@ async def scrape_examples(topic: str, num_examples: int = 3) -> List[Dict[str, s
                                 parts = url.split('uddg=')
                                 if len(parts) > 1:
                                     encoded_url = parts[1].split('&')[0]
-                                    actual_url = unquote(encoded_url)
-                                    # Validate it's a real URL
-                                    if actual_url.startswith('http'):
-                                        url = actual_url
-                                    else:
+                                    url = unquote(encoded_url)
+                                    if not url.startswith('http'):
                                         continue
                                 else:
                                     continue
                             else:
-                                # Try to extract from query params
                                 parsed = urlparse(url)
                                 params = parse_qs(parsed.query)
                                 if 'uddg' in params:
                                     url = unquote(params['uddg'][0])
                                 else:
                                     continue
-                        except Exception as e:
-                            print(f"Error parsing redirect URL: {e}")
+                        except:
                             continue
                     
-                    # Validate URL
-                    if not url.startswith('http'):
-                        continue
-                    
-                    # Avoid duplicates
-                    if any(ex['url'] == url for ex in examples):
-                        continue
-                    
-                    examples.append({
-                        "title": title[:100],  # Limit title length
-                        "url": url,
-                        "description": f"Learn more about {topic} with this resource"
-                    })
-                    
+                    if url.startswith('http') and not any(ex['url'] == url for ex in examples):
+                        examples.append({
+                            "title": title[:100],
+                            "url": url,
+                            "description": f"Learn more about {topic} with this resource"
+                        })
         except Exception as e:
-            print(f"Error in search strategy: {e}")
-            continue
-    
-    # If we still don't have enough examples, generate some using AI
-    if len(examples) < num_examples:
-        try:
-            # Use GPT to suggest relevant resources
-            prompt = f"""Suggest {num_examples - len(examples)} specific, real online resources (websites, tutorials, courses, documentation) for learning about: {topic}
-
-For each resource, provide:
-- A specific website/tool name
-- A realistic URL (can be a search URL if specific URL unknown)
-- A brief description
-
-Format as JSON array:
-[
-  {{"title": "Resource Name", "url": "https://example.com", "description": "Brief description"}},
-  ...
-]
-
-Your response (JSON only, no markdown):"""
-
-            response = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "You are an expert at finding learning resources. Suggest real, specific websites, tutorials, courses, or documentation that exist online."
-                    },
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=500,
-                temperature=0.7
-            )
-            
-            result = response.choices[0].message.content.strip()
-            if result.startswith("```json"):
-                result = result[7:]
-            if result.startswith("```"):
-                result = result[3:]
-            if result.endswith("```"):
-                result = result[:-3]
-            result = result.strip()
-            
-            ai_resources = json.loads(result)
-            for resource in ai_resources:
-                if len(examples) >= num_examples:
-                    break
-                # Avoid duplicates
-                if not any(ex['url'] == resource.get('url', '') for ex in examples):
-                    examples.append({
-                        "title": resource.get("title", f"{topic} Resource"),
-                        "url": resource.get("url", f"https://www.google.com/search?q={topic.replace(' ', '+')}"),
-                        "description": resource.get("description", f"Learn about {topic}")
-                    })
-        except Exception as e:
-            print(f"Error generating AI resources: {e}")
+            print(f"Error in web scraping (non-critical): {e}")
     
     # Final fallback if we still don't have enough
     if len(examples) == 0:
