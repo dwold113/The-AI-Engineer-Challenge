@@ -303,6 +303,49 @@ async def scrape_examples(topic: str, num_examples: int = 3) -> List[Dict[str, s
     
     return examples[:num_examples]
 
+def extract_topic_and_num_resources(topic: str) -> tuple[str, int]:
+    """
+    Extract the clean topic and requested number of resources from user input.
+    Handles patterns like "topic. Can you give me 10 resources" or "topic (5 examples)"
+    Returns (clean_topic, num_resources)
+    """
+    import re
+    
+    # Default number of resources
+    num_resources = 5
+    
+    # Look for patterns like "10 resources", "5 examples", "give me 8", etc.
+    patterns = [
+        r'(\d+)\s*(?:resources?|examples?|links?|sources?)',
+        r'give\s+me\s+(\d+)',
+        r'(\d+)\s+to\s+start',
+        r'(\d+)\s+i\s+can',
+    ]
+    
+    for pattern in patterns:
+        match = re.search(pattern, topic.lower())
+        if match:
+            try:
+                num = int(match.group(1))
+                # Reasonable limits: 3-20 resources
+                if 3 <= num <= 20:
+                    num_resources = num
+                    # Remove the resource request part from the topic
+                    topic = re.sub(pattern, '', topic, flags=re.IGNORECASE).strip()
+                    # Clean up common phrases
+                    topic = re.sub(r'\s*can\s+you\s+give\s+me\s*', '', topic, flags=re.IGNORECASE).strip()
+                    topic = re.sub(r'\s*i\s+can\s+start\s+with\s*', '', topic, flags=re.IGNORECASE).strip()
+                    topic = re.sub(r'\s*to\s+start\s*$', '', topic, flags=re.IGNORECASE).strip()
+                    break
+            except ValueError:
+                continue
+    
+    # Clean up the topic: remove trailing punctuation, extra spaces
+    topic = re.sub(r'[.,;:]+$', '', topic).strip()
+    topic = re.sub(r'\s+', ' ', topic)
+    
+    return topic, num_resources
+
 @app.post("/api/learn", response_model=LearningPlanResponse)
 async def create_learning_experience(request: LearningRequest):
     """
@@ -313,10 +356,13 @@ async def create_learning_experience(request: LearningRequest):
     if not os.getenv("OPENAI_API_KEY"):
         raise HTTPException(status_code=500, detail="OPENAI_API_KEY not configured")
     
-    topic = request.topic.strip()
+    original_topic = request.topic.strip()
     
-    # Validate the topic using AI to catch all edge cases
-    is_valid, validation_message = validate_learning_topic(topic)
+    # Extract clean topic and requested number of resources
+    clean_topic, num_resources = extract_topic_and_num_resources(original_topic)
+    
+    # Use clean topic for validation and plan generation
+    is_valid, validation_message = validate_learning_topic(clean_topic)
     if not is_valid:
         raise HTTPException(
             status_code=400,
@@ -325,8 +371,9 @@ async def create_learning_experience(request: LearningRequest):
     
     try:
         # Generate learning plan and scrape examples in parallel for speed
-        plan_task = generate_learning_plan(topic)
-        examples_task = scrape_examples(topic, num_examples=5)
+        # Use clean topic for plan generation, original topic for resource scraping (to get better search results)
+        plan_task = generate_learning_plan(clean_topic)
+        examples_task = scrape_examples(clean_topic, num_examples=num_resources)
         
         plan, examples = await asyncio.gather(plan_task, examples_task)
         
