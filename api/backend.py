@@ -304,28 +304,60 @@ async def scrape_examples(topic: str, num_examples: int = 3) -> List[Dict[str, s
     
     return examples[:num_examples]
 
-def extract_topic_and_num_resources(topic: str) -> tuple[str, int, str]:
+def extract_topic_and_num_resources(topic: str) -> tuple[str, int, str, int]:
     """
-    Extract the clean topic and requested number of resources from user input.
-    Uses AI to determine if the requested number is reasonable.
-    Handles patterns like "topic. Can you give me 10 resources" or "topic (5 examples)"
-    Returns (clean_topic, num_resources, message)
+    Extract the clean topic, requested number of resources, and requested number of steps from user input.
+    Uses AI to determine if the requested numbers are reasonable.
+    Handles patterns like "topic. Can you give me 10 resources" or "topic (5 examples)" or "give me 3 steps"
+    Returns (clean_topic, num_resources, message, num_steps)
     """
     import re
     
-    # Default number of resources
+    # Default numbers
     num_resources = 5
+    num_steps = None  # None means use default (5-7 steps)
     message = ""
     requested_num = None
+    requested_steps = None
     
-    # Look for patterns like "10 resources", "5 examples", "give me 8", etc.
-    patterns = [
+    # Look for patterns like "10 resources", "5 examples", "give me 8", "3 steps", etc.
+    resource_patterns = [
         r'(\d+)\s*(?:resources?|examples?|links?|sources?)',
-        r'give\s+me\s+(\d+)',
+        r'give\s+me\s+(\d+)\s*(?:resources?|examples?)',
         r'(\d+)\s+to\s+start',
         r'(\d+)\s+i\s+can',
         r'(\d+)\s+to\s+begin',
     ]
+    
+    step_patterns = [
+        r'(\d+)\s*steps?',
+        r'give\s+me\s+(\d+)\s*steps?',
+        r'(\d+)\s*step\s+plan',
+    ]
+    
+    # First, look for step requests
+    for pattern in step_patterns:
+        match = re.search(pattern, topic.lower())
+        if match:
+            try:
+                requested_steps = int(match.group(1))
+                # Remove the step request part from the topic
+                topic = re.sub(pattern, '', topic, flags=re.IGNORECASE).strip()
+                break
+            except ValueError:
+                continue
+    
+    # Then look for resource requests
+    for pattern in resource_patterns:
+        match = re.search(pattern, topic.lower())
+        if match:
+            try:
+                requested_num = int(match.group(1))
+                # Remove the resource request part from the topic
+                topic = re.sub(pattern, '', topic, flags=re.IGNORECASE).strip()
+                break
+            except ValueError:
+                continue
     
     for pattern in patterns:
         match = re.search(pattern, topic.lower())
@@ -409,9 +441,9 @@ Your response:"""
             if requested_num:
                 num_resources = min(requested_num, 30)
                 if requested_num > 30:
-                    message = f"You requested {requested_num} resources. I'll provide {num_resources} high-quality resources to keep it manageable."
+                    message += f"You requested {requested_num} resources. I'll provide {num_resources} high-quality resources to keep it manageable."
     
-    return topic, num_resources, message
+    return topic, num_resources, message.strip(), num_steps
 
 @app.post("/api/learn", response_model=LearningPlanResponse)
 async def create_learning_experience(request: LearningRequest):
@@ -425,8 +457,8 @@ async def create_learning_experience(request: LearningRequest):
     
     original_topic = request.topic.strip()
     
-    # Extract clean topic and requested number of resources
-    clean_topic, num_resources, resource_message = extract_topic_and_num_resources(original_topic)
+    # Extract clean topic, requested number of resources, and requested number of steps
+    clean_topic, num_resources, resource_message, num_steps = extract_topic_and_num_resources(original_topic)
     
     # Use clean topic for validation and plan generation
     is_valid, validation_message = validate_learning_topic(clean_topic)
@@ -438,8 +470,8 @@ async def create_learning_experience(request: LearningRequest):
     
     try:
         # Generate learning plan and scrape examples in parallel for speed
-        # Use clean topic for plan generation, original topic for resource scraping (to get better search results)
-        plan_task = generate_learning_plan(clean_topic)
+        # Use clean topic for plan generation, pass num_steps if specified
+        plan_task = generate_learning_plan(clean_topic, num_steps=num_steps)
         examples_task = scrape_examples(clean_topic, num_examples=num_resources)
         
         plan, examples = await asyncio.gather(plan_task, examples_task)
