@@ -80,6 +80,12 @@ def validate_prompt_makes_sense(prompt: str) -> tuple[bool, str]:
     if any(keyword in prompt_lower for keyword in gif_keywords):
         return (False, "DALL-E can only generate static images, not animated GIFs. Try describing the scene instead, like 'a boy dancing' or 'a dancing boy in motion'. You can upload your own GIF files using the 'Upload Image' option.")
     
+    # Check if user is requesting copyrighted/trademarked content
+    # DALL-E cannot accurately generate specific copyrighted characters, franchises, or brands
+    copyrighted_keywords = ['marvel', 'disney', 'star wars', 'starwars', 'superman', 'batman', 'spiderman', 'spider-man', 'iron man', 'captain america', 'avengers', 'x-men', 'wolverine', 'pokemon', 'pikachu', 'mario', 'sonic', 'mickey mouse', 'mickey', 'donald duck', 'goofy', 'nintendo', 'disney character']
+    if any(keyword in prompt_lower for keyword in copyrighted_keywords):
+        return (False, "DALL-E cannot generate accurate images of copyrighted characters or franchises (like Marvel, Disney, Star Wars, etc.). Try describing a similar scene instead, like 'superheroes in space' or 'cosmic warriors' or 'space heroes'.")
+    
     # Quick heuristic check for obviously valid prompts (skip AI validation for speed)
     # If prompt contains visual keywords, it's likely valid - skip expensive AI call
     visual_keywords = ['at', 'with', 'of', 'in', 'on', 'over', 'under', 'through', 'across', 'sunset', 'sunrise', 'night', 'day', 'city', 'mountain', 'ocean', 'forest', 'beach', 'sky', 'cloud', 'star', 'light', 'dark', 'color', 'abstract', 'pattern', 'scene', 'landscape', 'portrait', 'view']
