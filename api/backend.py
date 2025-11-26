@@ -190,47 +190,70 @@ JSON only:"""
         plan = data.get("plan", [])
         resources = data.get("resources", [])
         
-        # Process resources - validate URLs actually exist
-        examples = []
-        for resource in resources[:num_examples]:
+        # Process resources - validate URLs actually exist (in parallel for speed)
+        async def validate_url(resource: dict) -> dict | None:
+            """Validate a single URL and return resource dict if valid, None if invalid"""
             url = resource.get("url", "")
-            title = resource.get("title", f"{topic} Resource")
+            if not url or not url.startswith("http"):
+                return None
             
-            # Validate URL format and verify it actually exists and is accessible
-            if url and url.startswith("http"):
-                # Verify URL exists with actual HTTP request - must succeed to include
-                url_exists = False
-                try:
-                    async with httpx.AsyncClient(timeout=4.0, follow_redirects=True) as http_client:
-                        # Try HEAD first (faster), fallback to GET if HEAD not supported
-                        try:
-                            response = await http_client.head(url, allow_redirects=True)
-                            # Only include if URL returns success (2xx) or redirect (3xx)
-                            url_exists = 200 <= response.status_code < 400
-                        except httpx.HTTPStatusError as e:
-                            # If HEAD fails, try GET
-                            if hasattr(e, 'response') and 200 <= e.response.status_code < 400:
-                                url_exists = True
+            # Verify URL exists with actual HTTP request
+            try:
+                async with httpx.AsyncClient(timeout=3.0, follow_redirects=True) as http_client:
+                    # Try GET directly (more reliable than HEAD for many sites)
+                    try:
+                        response = await http_client.get(url, allow_redirects=True)
+                        # Only include if URL returns success (2xx) or redirect (3xx)
+                        if 200 <= response.status_code < 400:
+                            return {
+                                "title": resource.get("title", f"{topic} Resource"),
+                                "url": url,
+                                "description": resource.get("description", f"Learn about {topic}")
+                            }
+                        else:
+                            # Explicit 4xx or 5xx - URL is broken, don't include
+                            return None
+                    except httpx.HTTPStatusError as e:
+                        # Check if it's a 4xx/5xx error (broken) vs other HTTP error
+                        if hasattr(e, 'response'):
+                            status = e.response.status_code
+                            if 200 <= status < 400:
+                                # Actually valid, include it
+                                return {
+                                    "title": resource.get("title", f"{topic} Resource"),
+                                    "url": url,
+                                    "description": resource.get("description", f"Learn about {topic}")
+                                }
                             else:
-                                try:
-                                    response = await http_client.get(url, allow_redirects=True)
-                                    url_exists = 200 <= response.status_code < 400
-                                except httpx.HTTPStatusError:
-                                    url_exists = False
-                except (httpx.TimeoutException, httpx.ConnectError, httpx.RequestError):
-                    # Network errors (timeout, connection issues) - can't verify, don't include
-                    url_exists = False
-                except Exception:
-                    # Other errors - can't verify, don't include
-                    url_exists = False
-                
-                # Only include if URL actually exists and is accessible
-                if url_exists:
-                    examples.append({
-                        "title": title,
-                        "url": url,
-                        "description": resource.get("description", f"Learn about {topic}")
-                    })
+                                # 4xx or 5xx - broken URL
+                                return None
+                        return None
+            except (httpx.TimeoutException, httpx.ConnectError, httpx.RequestError):
+                # Network errors - URL might be valid but slow/unreachable
+                # For now, include it (better to show potentially working links than none)
+                # In production, you might want to retry or be more selective
+                return {
+                    "title": resource.get("title", f"{topic} Resource"),
+                    "url": url,
+                    "description": resource.get("description", f"Learn about {topic}")
+                }
+            except Exception:
+                # Other errors - be lenient, include it
+                return {
+                    "title": resource.get("title", f"{topic} Resource"),
+                    "url": url,
+                    "description": resource.get("description", f"Learn about {topic}")
+                }
+        
+        # Validate all URLs in parallel for speed
+        validation_tasks = [validate_url(resource) for resource in resources[:num_examples]]
+        validation_results = await asyncio.gather(*validation_tasks, return_exceptions=True)
+        
+        # Collect valid results
+        examples = []
+        for result in validation_results:
+            if result and isinstance(result, dict):
+                examples.append(result)
         
         # Fallback if plan is empty
         if not plan:
