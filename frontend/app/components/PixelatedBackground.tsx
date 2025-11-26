@@ -118,15 +118,14 @@ function BackgroundImage({ imageUrl }: BackgroundImageProps) {
   }
 
   // Determine best fit mode based on image and screen aspect ratio
-  // Use 'contain' for uploaded images (data URLs) to show full image without cropping
-  // Use 'contain' when image orientation doesn't match screen to prevent cropping
-  // This is especially important for portrait iPhone photos and GIFs
+  // Use 'cover' for generated images to fill entire screen
+  // Use 'contain' for uploaded images only when aspect ratio doesn't match screen (to prevent cropping)
   const isUploadedImage = imageUrl?.startsWith('data:')
-  const useContain = imageAspectRatio !== null && (
-    isUploadedImage || // Always use contain for uploaded images to show full image
+  const useContain = imageAspectRatio !== null && isUploadedImage && (
     (imageAspectRatio < 1 && screenAspectRatio > 1.2) || // Portrait image on landscape screen
     (imageAspectRatio > 1.5 && screenAspectRatio < 0.8)   // Very wide image on portrait screen
   )
+  // Generated images always use 'cover' to fill the screen
 
   // Render clear, high-quality background image using img element for maximum quality
   return (
