@@ -211,12 +211,11 @@ JSON only:"""
                             response = await http_client.get(url, allow_redirects=True)
                             url_exists = response.status_code < 400
                 except (httpx.TimeoutException, httpx.ConnectError, httpx.RequestError):
-                    # Network errors (timeout, connection issues) - URL might be valid but unreachable
-                    # Be lenient: if URL format looks valid, include it anyway
-                    url_exists = True
+                    # Network errors (timeout, connection issues) - can't verify, don't include
+                    url_exists = False
                 except Exception:
-                    # Other errors - be lenient, include if format looks valid
-                    url_exists = True
+                    # Other errors - can't verify, don't include
+                    url_exists = False
                 
                 # Include if URL is valid or if we couldn't verify (lenient approach)
                 if url_exists:
@@ -323,24 +322,26 @@ JSON only:"""
                         # Verify URL exists (lenient for network issues)
                         url_valid = False
                         try:
-                            async with httpx.AsyncClient(timeout=2.0, follow_redirects=True) as http_client:
+                            async with httpx.AsyncClient(timeout=4.0, follow_redirects=True) as http_client:
                                 try:
                                     response = await http_client.head(url, allow_redirects=True)
-                                    url_valid = response.status_code < 400
+                                    # Only include if URL returns success (2xx) or redirect (3xx)
+                                    url_valid = 200 <= response.status_code < 400
                                 except httpx.HTTPStatusError as e:
-                                    if hasattr(e, 'response') and e.response.status_code < 400:
+                                    if hasattr(e, 'response') and 200 <= e.response.status_code < 400:
                                         url_valid = True
                                     else:
                                         try:
                                             response = await http_client.get(url, allow_redirects=True)
-                                            url_valid = response.status_code < 400
+                                            url_valid = 200 <= response.status_code < 400
                                         except httpx.HTTPStatusError:
                                             url_valid = False
                         except (httpx.TimeoutException, httpx.ConnectError, httpx.RequestError):
-                            # Network errors - be lenient, include if format looks valid
-                            url_valid = True
+                            # Network errors - can't verify, don't include
+                            url_valid = False
                         except Exception:
-                            url_valid = True
+                            # Other errors - can't verify, don't include
+                            url_valid = False
                         
                         if url_valid:
                             examples.append({
