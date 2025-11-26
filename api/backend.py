@@ -320,7 +320,9 @@ Perform these tasks in one response:
 2. Extract any requested number of resources/examples (if mentioned)
 3. Extract any requested number of steps (if mentioned)
 4. Validate if the topic is learnable:
-   - Not gibberish or random characters
+   - CRITICAL: NOT gibberish, random characters, or nonsensical text
+     → Examples to REJECT: "fgnrjk gnsogfd", "asdfgh", "xyz abc", "qwerty", any random letter combinations
+     → If the input has no meaning, is just random characters, or doesn't form real words, set is_valid to false
    - Not abstract philosophical concepts
    - Not too vague
    - CRITICAL: NOT about a specific real person (politicians, celebrities, public figures, historical figures, etc.)
@@ -330,7 +332,10 @@ Perform these tasks in one response:
      → If about a person, suggest learning about their field/domain instead (e.g., "business strategy" instead of "donald trump", "public speaking" instead of "barack obama")
 5. If a resource number was requested, determine if it's reasonable (3-15 is reasonable)
 
-IMPORTANT: If the input appears to be a person's name (first name + last name pattern, or a well-known single name), you MUST reject it and provide a helpful alternative suggestion.
+IMPORTANT RULES:
+- If the input is gibberish/random characters (like "fgnrjk gnsogfd"), you MUST reject it and set is_valid to false
+- If the input appears to be a person's name (first name + last name pattern, or a well-known single name), you MUST reject it and provide a helpful alternative suggestion
+- Only approve topics that are real, meaningful, learnable subjects, skills, or concepts
 
 Respond in JSON format:
 {{
@@ -338,7 +343,7 @@ Respond in JSON format:
   "num_resources": number or null,
   "num_steps": number or null,
   "is_valid": true/false,
-  "validation_message": "error message if invalid, empty if valid. If about a person, suggest learning the skill/domain instead (e.g., 'Try learning about public speaking, leadership, or political science instead').",
+  "validation_message": "error message if invalid, empty if valid. If gibberish, say 'This appears to be random characters or gibberish. Please enter a real learning topic.' If about a person, suggest learning the skill/domain instead.",
   "resource_message": "message if resource count was adjusted, empty otherwise"
 }}
 
@@ -346,7 +351,7 @@ JSON only:"""
 
         result = call_ai(
             combined_prompt,
-            "Expert at extracting and validating learning topics. You MUST reject any topic that is a specific real person's name (politicians, celebrities, public figures, historical figures). Learning plans are for skills, subjects, and concepts only - never for people. If you detect a person's name, reject it and suggest learning their field/domain instead. Be strict about this rule.",
+            "Expert at extracting and validating learning topics. You MUST reject: (1) Gibberish/random characters/nonsensical text - if input has no meaning or is just random letters, reject it. (2) Specific real person names - learning plans are for skills, subjects, and concepts only, never for people. Be very strict about detecting gibberish and person names. Only approve real, meaningful, learnable topics.",
             max_tokens=200,
             temperature=0.1
         )
