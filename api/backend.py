@@ -252,8 +252,8 @@ JSON only:"""
     # Only try web scraping if we don't have enough examples (quick single attempt)
     if len(examples) < num_examples:
         try:
-            # Single quick web scraping attempt (reduced timeout)
-            async with httpx.AsyncClient(timeout=3.0, follow_redirects=True) as http_client:
+            # Single quick web scraping attempt (2 second timeout max - very aggressive)
+            async with httpx.AsyncClient(timeout=2.0, follow_redirects=True) as http_client:
                 headers = {
                     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
                 }
