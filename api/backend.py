@@ -5,6 +5,7 @@ from openai import OpenAI
 import os
 import httpx
 import asyncio
+import re
 from urllib.parse import unquote
 from dotenv import load_dotenv
 from bs4 import BeautifulSoup
@@ -31,6 +32,101 @@ class LearningRequest(BaseModel):
 class LearningPlanResponse(BaseModel):
     plan: List[Dict[str, str]]
     examples: List[Dict[str, str]]
+
+def validate_learning_topic(topic: str) -> tuple[bool, str]:
+    """
+    Use AI to determine if a topic is valid for learning.
+    Uses common sense to check if the topic makes sense and can be learned.
+    Returns (is_valid, message)
+    """
+    topic_lower = topic.lower().strip()
+    words = topic_lower.split()
+    
+    # Quick sanity checks (no API call needed)
+    if len(words) < 1:
+        return (False, "Please enter a topic you want to learn about.")
+    
+    if len(topic) < 2:
+        return (False, "Topic is too short. Please provide more details.")
+    
+    if len(topic) > 200:
+        return (False, "Topic is too long. Please keep it under 200 characters.")
+    
+    # Check for repeated characters or obvious nonsense
+    if len(set(topic_lower.replace(' ', ''))) < 3:
+        return (False, "Please provide a meaningful topic, not just repeated characters.")
+    
+    # Check for only special characters or numbers
+    only_special_chars = /^[^a-zA-Z\s]{2,}$/
+    if only_special_chars.match(topic_lower):
+        return (False, "Please use words to describe what you want to learn, not just symbols or numbers.")
+    
+    # Use AI to validate the topic - it will intelligently catch all edge cases
+    try:
+        validation_prompt = f"""Analyze this learning topic: "{topic}"
+
+Check if this is a valid topic someone can learn about:
+
+1. Is it a real, meaningful topic? (not gibberish like "gfdnjlg nfgdsgdnjklgfnjs")
+2. Can someone actually learn about this? (not abstract concepts like "the meaning of life" or "what is love")
+3. Is it specific enough to create a learning plan? (not too vague like "stuff" or "things")
+4. Does it make sense as a learning subject? (not nonsensical combinations)
+
+Examples of VALID topics:
+- "Python programming" ✅
+- "Machine Learning" ✅
+- "Cooking Italian food" ✅
+- "Web Development" ✅
+- "Spanish language" ✅
+- "Photography" ✅
+
+Examples of INVALID topics:
+- "gfdnjlg nfgdsgdnjklgfnjs" ❌ (gibberish/nonsense)
+- "the meaning of life" ❌ (too abstract/philosophical)
+- "asdfghjkl" ❌ (random keyboard mashing)
+- "123456" ❌ (just numbers)
+- "what is love" ❌ (abstract concept, not a learnable skill)
+- "stuff" ❌ (too vague)
+
+Respond ONLY:
+- "VALID" if it's a real, learnable topic
+- "INVALID: [specific reason and helpful suggestion]" if it's not valid
+
+Response:"""
+
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are an expert at determining if a topic is valid for learning. Use common sense to detect gibberish, abstract concepts, and nonsensical inputs. Be strict - only approve topics that are real, specific, and learnable."
+                },
+                {"role": "user", "content": validation_prompt}
+            ],
+            max_tokens=80,  # Enough for reason + suggestion
+            temperature=0.1  # Low temperature for consistent validation
+        )
+        
+        result = response.choices[0].message.content.strip().upper()
+        
+        if result.startswith("VALID"):
+            return (True, "")
+        elif result.startswith("INVALID"):
+            # Extract the explanation
+            explanation = result.replace("INVALID", "").strip()
+            if explanation.startswith(":"):
+                explanation = explanation[1:].strip()
+            return (False, explanation if explanation else "This doesn't seem like a valid learning topic. Please enter something specific you want to learn, like 'Python programming' or 'Cooking Italian food'.")
+        else:
+            # If response format is unexpected, be conservative and allow it
+            # Better to let the system try than to block valid topics
+            return (True, "")
+            
+    except Exception as e:
+        # If AI validation fails, be lenient and allow the topic
+        # Better to let the system try than to block valid topics
+        print(f"Validation error: {e}")
+        return (True, "")
 
 @app.get("/")
 def root():
@@ -213,10 +309,14 @@ async def create_learning_experience(request: LearningRequest):
         raise HTTPException(status_code=500, detail="OPENAI_API_KEY not configured")
     
     topic = request.topic.strip()
-    if len(topic) < 3:
-        raise HTTPException(status_code=400, detail="Topic is too short. Please provide more details.")
-    if len(topic) > 200:
-        raise HTTPException(status_code=400, detail="Topic is too long. Please keep it under 200 characters.")
+    
+    # Validate the topic using AI to catch all edge cases
+    is_valid, validation_message = validate_learning_topic(topic)
+    if not is_valid:
+        raise HTTPException(
+            status_code=400,
+            detail=validation_message or "This doesn't seem like a valid learning topic. Please enter something specific you want to learn, like 'Python programming' or 'Cooking Italian food'."
+        )
     
     try:
         # Generate learning plan and scrape examples in parallel for speed
