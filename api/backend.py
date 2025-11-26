@@ -59,71 +59,83 @@ def chat(request: ChatRequest):
 
 def validate_prompt_makes_sense(prompt: str) -> tuple[bool, str]:
     """
-    Validate if a prompt makes sense for image generation by checking if it describes visual elements.
+    Use AI to determine if a prompt can be visualized as an image.
+    Uses common sense to check if the phrase describes something that can be pictured.
     Returns (is_valid, message)
     """
     prompt_lower = prompt.lower().strip()
     words = prompt_lower.split()
     
-    # Quick checks for obvious invalid prompts
-    test_words = ['test', 'dummy', 'placeholder', 'example', 'sample', 'asdf', 'qwerty']
-    if len(words) <= 2 and any(word in test_words for word in words):
-        return (False, "This doesn't describe a visual scene. Please describe what you want to see, like 'a sunset over mountains' or 'a cozy coffee shop'.")
+    # Quick sanity checks (no API call needed)
+    if len(words) < 2:
+        return (False, "Please provide more details about what you want to see.")
     
-    # Check for repeated characters or nonsense
+    # Check for repeated characters or obvious nonsense
     if len(set(prompt_lower.replace(' ', ''))) < 3:
-        return (False, "Please provide a meaningful description of a visual scene, not just repeated characters.")
+        return (False, "Please provide a meaningful description, not just repeated characters.")
     
-    # Check if prompt contains visual/descriptive words that indicate it can be turned into an image
-    visual_keywords = [
-        # Objects and things
-        'image', 'picture', 'photo', 'scene', 'view', 'landscape', 'portrait', 'art', 'artwork', 'design',
-        # Places and locations
-        'city', 'forest', 'beach', 'mountain', 'ocean', 'desert', 'valley', 'island', 'room', 'house', 'building',
-        # Nature
-        'sunset', 'sunrise', 'sky', 'cloud', 'tree', 'flower', 'water', 'river', 'lake', 'sea',
-        # Time and atmosphere
-        'night', 'day', 'morning', 'evening', 'foggy', 'sunny', 'rainy', 'snowy',
-        # Colors and styles
-        'color', 'colour', 'bright', 'dark', 'vibrant', 'abstract', 'geometric', 'pattern',
-        # Actions and concepts that can be visualized
-        'flying', 'floating', 'glowing', 'shining', 'reflection', 'shadow', 'light', 'space',
-        # Descriptive adjectives
-        'serene', 'peaceful', 'dramatic', 'majestic', 'beautiful', 'stunning', 'epic', 'vast',
-        # Visual concepts
-        'horizon', 'perspective', 'depth', 'texture', 'gradient', 'silhouette'
-    ]
-    
-    # Check if prompt contains visual keywords
-    has_visual_keywords = any(keyword in prompt_lower for keyword in visual_keywords)
-    
-    # Check for abstract/philosophical phrases that don't describe visuals
-    abstract_phrases = [
-        'infinite possibilities', 'freedom to', 'open weights', 'philosophy', 'concept', 'idea',
-        'meaning of', 'purpose of', 'essence of', 'nature of', 'truth about'
-    ]
-    
-    has_abstract_phrase = any(phrase in prompt_lower for phrase in abstract_phrases)
-    
-    # If it has abstract phrases but no visual keywords, it's probably not suitable for image generation
-    if has_abstract_phrase and not has_visual_keywords:
-        return (False, "This prompt is too abstract or philosophical. Please describe a visual scene you want to see, like 'a futuristic city at night' or 'abstract geometric patterns in blue and purple'.")
-    
-    # If it has visual keywords, allow it
-    if has_visual_keywords:
+    # Use AI to determine if the prompt can be visualized
+    try:
+        validation_prompt = f"""Analyze this image generation prompt step by step:
+
+Prompt: "{prompt}"
+
+Step 1: Does this describe something that can be visualized as an image?
+- Can you picture this in your mind?
+- Does it describe visual elements (objects, scenes, colors, shapes, landscapes, etc.)?
+- Or is it abstract/philosophical (concepts, ideas, emotions without visual representation)?
+
+Step 2: Examples of what CAN be visualized:
+- "a sunset over mountains" ✅ (clear visual scene)
+- "abstract geometric patterns" ✅ (visual design)
+- "a cyberpunk city at night" ✅ (describes a scene)
+- "serene forest with glowing mushrooms" ✅ (visual elements)
+
+Step 3: Examples of what CANNOT be visualized:
+- "Open weights. Infinite possibilities" ❌ (abstract concept, no visual elements)
+- "the meaning of life" ❌ (philosophical, not visual)
+- "freedom to run anywhere" ❌ (abstract concept, not a scene)
+
+Step 4: Your analysis:
+Respond with ONLY one of these:
+- "VALID" if it can be visualized as an image
+- "INVALID: [brief explanation]" if it cannot be visualized, with a helpful suggestion
+
+Your response:"""
+
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",  # Fast and cheap for validation
+            messages=[
+                {
+                    "role": "system", 
+                    "content": "You are an expert at determining if text can be visualized as an image. Use common sense and think step by step. Be strict - only approve prompts that clearly describe visual scenes, objects, or designs that can be rendered as images."
+                },
+                {"role": "user", "content": validation_prompt}
+            ],
+            max_tokens=150,
+            temperature=0.2  # Low temperature for consistent validation
+        )
+        
+        result = response.choices[0].message.content.strip().upper()
+        
+        if result.startswith("VALID"):
+            return (True, "")
+        elif result.startswith("INVALID"):
+            # Extract the explanation
+            explanation = result.replace("INVALID", "").strip()
+            if explanation.startswith(":"):
+                explanation = explanation[1:].strip()
+            return (False, explanation if explanation else "This doesn't describe a visual scene. Please describe what you want to see, like 'a sunset over mountains' or 'abstract geometric patterns'.")
+        else:
+            # If response format is unexpected, be conservative and allow it
+            # Let DALL-E decide if it can generate it
+            return (True, "")
+            
+    except Exception as e:
+        # If AI validation fails, be lenient and allow the prompt
+        # Better to let DALL-E try than to block valid prompts
+        print(f"Validation error: {e}")
         return (True, "")
-    
-    # If it's very short (less than 3 words), require more detail
-    if len(words) < 3:
-        return (False, "Please provide more details about the visual scene you want to see.")
-    
-    # For longer prompts without obvious visual keywords, be lenient but warn
-    # Let DALL-E try to interpret it, but suggest improvement
-    if len(words) >= 5:
-        return (True, "")  # Allow longer prompts even without obvious keywords
-    
-    # For medium-length prompts without visual keywords, suggest improvement
-    return (False, "This doesn't clearly describe a visual scene. Try describing what you want to see, like 'a cyberpunk cityscape' or 'a serene mountain landscape at sunset'.")
 
 @app.post("/api/generate-image")
 async def generate_image(request: ImageRequest):

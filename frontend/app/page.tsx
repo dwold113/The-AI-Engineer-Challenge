@@ -29,66 +29,15 @@ const validatePrompt = (prompt: string): { valid: boolean; error?: string } => {
     return { valid: false, error: 'Please use words to describe your background, not just symbols or numbers.' }
   }
   
-  // Check for common test/nonsensical words
-  const testWords = ['dummy', 'test', 'placeholder', 'example', 'sample', 'asdf', 'qwerty', '123', 'abc']
-  const lowerPrompt = trimmed.toLowerCase()
-  if (testWords.some(word => lowerPrompt === word || lowerPrompt.split(/\s+/).includes(word))) {
-    return { valid: false, error: 'This doesn\'t describe a visual scene. Please describe what you want to see, like "a sunset over mountains" or "a cozy coffee shop".' }
-  }
-  
-  // Check if prompt contains visual/descriptive words that indicate it can be turned into an image
-  const visualKeywords = [
-    // Objects and things
-    'image', 'picture', 'photo', 'scene', 'view', 'landscape', 'portrait', 'art', 'artwork', 'design',
-    // Places and locations
-    'city', 'forest', 'beach', 'mountain', 'ocean', 'desert', 'valley', 'island', 'room', 'house', 'building',
-    // Nature
-    'sunset', 'sunrise', 'sky', 'cloud', 'tree', 'flower', 'water', 'river', 'lake', 'sea',
-    // Time and atmosphere
-    'night', 'day', 'morning', 'evening', 'foggy', 'sunny', 'rainy', 'snowy',
-    // Colors and styles
-    'color', 'colour', 'bright', 'dark', 'vibrant', 'abstract', 'geometric', 'pattern',
-    // Actions and concepts that can be visualized
-    'flying', 'floating', 'glowing', 'shining', 'reflection', 'shadow', 'light', 'space',
-    // Descriptive adjectives
-    'serene', 'peaceful', 'dramatic', 'majestic', 'beautiful', 'stunning', 'epic', 'vast',
-    // Visual concepts
-    'horizon', 'perspective', 'depth', 'texture', 'gradient', 'silhouette'
-  ]
-  
-  const hasVisualKeywords = visualKeywords.some(keyword => lowerPrompt.includes(keyword))
-  
-  // Check for abstract/philosophical phrases that don't describe visuals
-  const abstractPhrases = [
-    'infinite possibilities', 'freedom to', 'open weights', 'philosophy', 'concept', 'idea',
-    'meaning of', 'purpose of', 'essence of', 'nature of', 'truth about'
-  ]
-  
-  const hasAbstractPhrase = abstractPhrases.some(phrase => lowerPrompt.includes(phrase))
-  
-  // If it has abstract phrases but no visual keywords, it's probably not suitable
-  if (hasAbstractPhrase && !hasVisualKeywords) {
-    return { valid: false, error: 'This prompt is too abstract or philosophical. Please describe a visual scene you want to see, like "a futuristic city at night" or "abstract geometric patterns in blue and purple".' }
-  }
-  
-  // If it has visual keywords, allow it
-  if (hasVisualKeywords) {
-    return { valid: true }
-  }
-  
-  // If it's very short (less than 3 words), require more detail
+  // Basic word count check
   const wordCount = trimmed.split(/\s+/).filter(word => word.length > 0).length
-  if (wordCount < 3) {
-    return { valid: false, error: 'Please provide more details about the visual scene you want to see.' }
+  if (wordCount < 2) {
+    return { valid: false, error: 'Please provide more details about what you want to see.' }
   }
   
-  // For longer prompts without obvious visual keywords, be lenient
-  if (wordCount >= 5) {
-    return { valid: true }  // Allow longer prompts even without obvious keywords
-  }
-  
-  // For medium-length prompts without visual keywords, suggest improvement
-  return { valid: false, error: 'This doesn\'t clearly describe a visual scene. Try describing what you want to see, like "a cyberpunk cityscape" or "a serene mountain landscape at sunset".' }
+  // All other validation (checking if it can be visualized) happens on the backend using AI
+  // The backend uses GPT to intelligently determine if the prompt describes something visual
+  return { valid: true }
 }
 
 export default function Home() {
