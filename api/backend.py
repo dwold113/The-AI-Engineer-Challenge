@@ -319,22 +319,29 @@ JSON only:"""
                 for resource in fallback_resources:
                     url = resource.get("url", "")
                     if url and url.startswith("http"):
-                        # Verify URL actually exists before adding
-                        url_exists = False
+                        # Verify URL exists (lenient for network issues)
+                        url_valid = False
                         try:
-                            async with httpx.AsyncClient(timeout=3.0, follow_redirects=True) as http_client:
+                            async with httpx.AsyncClient(timeout=2.0, follow_redirects=True) as http_client:
                                 try:
                                     response = await http_client.head(url, allow_redirects=True)
-                                    url_exists = response.status_code < 400
-                                except httpx.HTTPStatusError:
-                                    response = await http_client.get(url, allow_redirects=True)
-                                    url_exists = response.status_code < 400
+                                    url_valid = response.status_code < 400
+                                except httpx.HTTPStatusError as e:
+                                    if hasattr(e, 'response') and e.response.status_code < 400:
+                                        url_valid = True
+                                    else:
+                                        try:
+                                            response = await http_client.get(url, allow_redirects=True)
+                                            url_valid = response.status_code < 400
+                                        except httpx.HTTPStatusError:
+                                            url_valid = False
                         except (httpx.TimeoutException, httpx.ConnectError, httpx.RequestError):
-                            url_exists = False
+                            # Network errors - be lenient, include if format looks valid
+                            url_valid = True
                         except Exception:
-                            url_exists = False
+                            url_valid = True
                         
-                        if url_exists:
+                        if url_valid:
                             examples.append({
                                 "title": resource.get("title", f"{topic} Resource"),
                                 "url": url,
