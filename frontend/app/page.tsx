@@ -189,6 +189,7 @@ export default function Home() {
         const img = new Image()
         img.onload = () => {
           setImageUrl(result)
+          setIsGeneratedImage(false) // Mark as uploaded image
           setIsGenerating(false)
         }
         img.onerror = () => {
