@@ -190,42 +190,35 @@ JSON only:"""
         plan = data.get("plan", [])
         resources = data.get("resources", [])
         
-        # Process resources - validate URLs and format
+        # Process resources - validate URLs actually exist
         examples = []
         for resource in resources[:num_examples]:
             url = resource.get("url", "")
             title = resource.get("title", f"{topic} Resource")
             
-            # Validate URL format and try to verify it exists (lenient - don't block if check fails)
+            # Validate URL format and verify it actually exists
             if url and url.startswith("http"):
-                # Check URL format and known educational domains
-                url_lower = url.lower()
-                known_domains = [
-                    "khanacademy.org", "coursera.org", "edx.org", "youtube.com", 
-                    "github.com", "developer.mozilla.org", "wikipedia.org", 
-                    "geeksforgeeks.org", "codecademy.com", "udemy.com", "udacity.com",
-                    "freecodecamp.org", "stackoverflow.com", "w3schools.com"
-                ]
-                
-                # If URL is from a known educational domain, include it
-                is_known_domain = any(domain in url_lower for domain in known_domains)
-                
-                # Try to verify URL exists (but don't block if check fails)
-                url_valid = False
-                if is_known_domain:
-                    # For known domains, trust the URL format
-                    url_valid = True
-                else:
-                    # For unknown domains, try quick validation
-                    try:
-                        async with httpx.AsyncClient(timeout=2.0, follow_redirects=True) as http_client:
+                # Verify URL exists with actual HTTP request
+                url_exists = False
+                try:
+                    async with httpx.AsyncClient(timeout=3.0, follow_redirects=True) as http_client:
+                        # Try HEAD first (faster), fallback to GET if HEAD not supported
+                        try:
                             response = await http_client.head(url, allow_redirects=True)
-                            url_valid = response.status_code < 400
-                    except Exception:
-                        # If validation fails, still include if URL format looks valid
-                        url_valid = True  # Be lenient - format looks OK
+                            url_exists = response.status_code < 400
+                        except httpx.HTTPStatusError:
+                            # If HEAD fails, try GET
+                            response = await http_client.get(url, allow_redirects=True)
+                            url_exists = response.status_code < 400
+                except (httpx.TimeoutException, httpx.ConnectError, httpx.RequestError):
+                    # Network errors - URL might exist but unreachable, skip it
+                    url_exists = False
+                except Exception:
+                    # Other errors - skip this URL
+                    url_exists = False
                 
-                if url_valid:
+                # Only include if URL actually exists and is accessible
+                if url_exists:
                     examples.append({
                         "title": title,
                         "url": url,
@@ -326,12 +319,27 @@ JSON only:"""
                 for resource in fallback_resources:
                     url = resource.get("url", "")
                     if url and url.startswith("http"):
-                        # Include if URL format is valid (lenient validation)
-                        examples.append({
-                            "title": resource.get("title", f"{topic} Resource"),
-                            "url": url,
-                            "description": resource.get("description", f"Learn about {topic}")
-                        })
+                        # Verify URL actually exists before adding
+                        url_exists = False
+                        try:
+                            async with httpx.AsyncClient(timeout=3.0, follow_redirects=True) as http_client:
+                                try:
+                                    response = await http_client.head(url, allow_redirects=True)
+                                    url_exists = response.status_code < 400
+                                except httpx.HTTPStatusError:
+                                    response = await http_client.get(url, allow_redirects=True)
+                                    url_exists = response.status_code < 400
+                        except (httpx.TimeoutException, httpx.ConnectError, httpx.RequestError):
+                            url_exists = False
+                        except Exception:
+                            url_exists = False
+                        
+                        if url_exists:
+                            examples.append({
+                                "title": resource.get("title", f"{topic} Resource"),
+                                "url": url,
+                                "description": resource.get("description", f"Learn about {topic}")
+                            })
             except Exception as e:
                 print(f"Error generating fallback resources: {e}")
         
