@@ -346,39 +346,14 @@ JSON only:"""
                 
                 fallback_result = call_ai(fallback_prompt, "Expert at finding educational resources. Provide URLs from well-known educational platforms with standard URLs.", max_tokens=200, temperature=0.5)
                 fallback_resources = parse_json_response(fallback_result)
-                for resource in fallback_resources:
-                    url = resource.get("url", "")
-                    if url and url.startswith("http"):
-                        # Verify URL exists (lenient for network issues)
-                        url_valid = False
-                        try:
-                            async with httpx.AsyncClient(timeout=4.0, follow_redirects=True) as http_client:
-                                try:
-                                    response = await http_client.head(url, allow_redirects=True)
-                                    # Only include if URL returns success (2xx) or redirect (3xx)
-                                    url_valid = 200 <= response.status_code < 400
-                                except httpx.HTTPStatusError as e:
-                                    if hasattr(e, 'response') and 200 <= e.response.status_code < 400:
-                                        url_valid = True
-                                    else:
-                                        try:
-                                            response = await http_client.get(url, allow_redirects=True)
-                                            url_valid = 200 <= response.status_code < 400
-                                        except httpx.HTTPStatusError:
-                                            url_valid = False
-                        except (httpx.TimeoutException, httpx.ConnectError, httpx.RequestError):
-                            # Network errors - can't verify, don't include
-                            url_valid = False
-                        except Exception:
-                            # Other errors - can't verify, don't include
-                            url_valid = False
-                        
-                        if url_valid:
-                            examples.append({
-                                "title": resource.get("title", f"{topic} Resource"),
-                                "url": url,
-                                "description": resource.get("description", f"Learn about {topic}")
-                            })
+                
+                # Validate fallback URLs in parallel
+                fallback_validation_tasks = [validate_url(resource) for resource in fallback_resources]
+                fallback_results = await asyncio.gather(*fallback_validation_tasks, return_exceptions=True)
+                
+                for result in fallback_results:
+                    if result and isinstance(result, dict):
+                        examples.append(result)
             except Exception as e:
                 print(f"Error generating fallback resources: {e}")
         
