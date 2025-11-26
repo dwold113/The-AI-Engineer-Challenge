@@ -5,6 +5,7 @@ from openai import OpenAI
 import os
 import httpx
 import asyncio
+from urllib.parse import unquote
 from dotenv import load_dotenv
 from bs4 import BeautifulSoup
 from typing import List, Dict
