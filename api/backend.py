@@ -507,43 +507,31 @@ async def expand_learning_step(topic: str, step_title: str, step_description: st
     Focuses on gaps, nuances, and practical details that weren't covered in the main step.
     """
     try:
-        prompt = f"""The user is learning about: {topic}
+        prompt = f"""Topic: {topic}
+Step: {step_title} - {step_description}
 
-They want additional clarity on this step:
-Title: {step_title}
-Description: {step_description}
-
-IMPORTANT: Do NOT repeat information already in the step title or description. Instead, provide:
-1. Additional context and nuances that weren't mentioned
-2. Practical implementation details and how-to specifics
-3. Important considerations or prerequisites they should know
-4. Real-world applications or examples specific to this step
-5. Potential challenges and how to overcome them
-
-Focus on filling gaps and providing clarity that complements (not repeats) the existing step.
-
-Format your response as JSON with this structure:
+Provide complementary details (don't repeat). JSON format:
 {{
-  "additionalContext": "Important context, nuances, or background information not covered in the main step...",
-  "practicalDetails": ["Specific how-to detail 1", "Specific how-to detail 2", "Specific how-to detail 3"],
+  "additionalContext": "Brief context not covered...",
+  "practicalDetails": ["Detail 1", "Detail 2", "Detail 3"],
   "importantConsiderations": ["Consideration 1", "Consideration 2"],
   "realWorldExamples": ["Example 1", "Example 2"],
-  "potentialChallenges": ["Challenge 1 with solution", "Challenge 2 with solution"]
+  "potentialChallenges": ["Challenge with solution 1", "Challenge with solution 2"]
 }}
 
-Your response (JSON only, no markdown):"""
+JSON only:"""
 
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
                 {
                     "role": "system",
-                    "content": "You are an expert educator who provides detailed, actionable learning guidance. Always respond with valid JSON only."
+                    "content": "Expert educator. Provide complementary learning details. JSON only."
                 },
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=800,
-            temperature=0.7
+            max_tokens=500,  # Reduced from 800 for speed
+            temperature=0.6  # Slightly lower for faster, more consistent responses
         )
         
         result = response.choices[0].message.content.strip()
