@@ -16,6 +16,44 @@ load_dotenv()
 
 app = FastAPI()
 
+# ===== HELPER FUNCTIONS =====
+
+def clean_json_response(text: str) -> str:
+    """
+    Clean AI response by removing markdown code blocks.
+    Handles ```json, ```, and trailing ``` patterns.
+    """
+    result = text.strip()
+    if result.startswith("```json"):
+        result = result[7:]
+    if result.startswith("```"):
+        result = result[3:]
+    if result.endswith("```"):
+        result = result[:-3]
+    return result.strip()
+
+def call_ai(prompt: str, system_message: str, max_tokens: int = 500, temperature: float = 0.5) -> str:
+    """
+    Common function to call OpenAI API and return cleaned response.
+    """
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": system_message},
+            {"role": "user", "content": prompt}
+        ],
+        max_tokens=max_tokens,
+        temperature=temperature
+    )
+    return clean_json_response(response.choices[0].message.content)
+
+def parse_json_response(text: str) -> any:
+    """
+    Clean and parse JSON from AI response.
+    """
+    cleaned = clean_json_response(text)
+    return json.loads(cleaned)
+
 # CORS so the frontend can talk to backend
 app.add_middleware(
     CORSMiddleware,
@@ -65,20 +103,12 @@ Respond ONLY:
 
 Response:"""
 
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are an expert at determining if a topic is valid for learning. Use common sense to detect gibberish, abstract concepts, and nonsensical inputs. Be strict - only approve topics that are real, specific, and learnable."
-                },
-                {"role": "user", "content": validation_prompt}
-            ],
-            max_tokens=80,  # Enough for reason + suggestion
-            temperature=0.1  # Low temperature for consistent validation
-        )
-        
-        result = response.choices[0].message.content.strip().upper()
+        result = call_ai(
+            validation_prompt,
+            "You are an expert at determining if a topic is valid for learning. Use common sense to detect gibberish, abstract concepts, and nonsensical inputs. Be strict - only approve topics that are real, specific, and learnable.",
+            max_tokens=80,
+            temperature=0.1
+        ).upper()
         
         if result.startswith("VALID"):
             return (True, "")
@@ -129,31 +159,8 @@ async def generate_learning_plan(topic: str, num_steps: int = None) -> List[Dict
 
 JSON only:"""
 
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {
-                    "role": "system",
-                    "content": "Expert educator. JSON only."
-                },
-                {"role": "user", "content": prompt}
-            ],
-            max_tokens=600,  # Further reduced for speed
-            temperature=0.6  # Lower for faster responses
-        )
-        
-        result = response.choices[0].message.content.strip()
-        
-        # Remove markdown code blocks if present
-        if result.startswith("```json"):
-            result = result[7:]
-        if result.startswith("```"):
-            result = result[3:]
-        if result.endswith("```"):
-            result = result[:-3]
-        result = result.strip()
-        
-        plan = json.loads(result)
+        result = call_ai(prompt, "Expert educator. JSON only.", max_tokens=500, temperature=0.5)
+        plan = parse_json_response(result)
         return plan
     except Exception as e:
         print(f"Error generating learning plan: {e}")
@@ -182,29 +189,8 @@ JSON: [{{"title": "Name", "url": "https://real-site.com", "description": "Brief"
 
 JSON only:"""
 
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {
-                    "role": "system",
-                    "content": "Expert at finding real learning resources. Provide actual website URLs only."
-                },
-                {"role": "user", "content": prompt}
-            ],
-            max_tokens=300,
-            temperature=0.5
-        )
-        
-        result = response.choices[0].message.content.strip()
-        if result.startswith("```json"):
-            result = result[7:]
-        if result.startswith("```"):
-            result = result[3:]
-        if result.endswith("```"):
-            result = result[:-3]
-        result = result.strip()
-        
-        ai_resources = json.loads(result)
+        result = call_ai(prompt, "Expert at finding real learning resources. Provide actual website URLs only.", max_tokens=300, temperature=0.5)
+        ai_resources = parse_json_response(result)
         for resource in ai_resources:
             if len(examples) >= num_examples:
                 break
@@ -291,29 +277,8 @@ JSON: [{{"title": "Resource Name", "url": "https://real-site.com", "description"
 
 JSON only:"""
             
-            fallback_response = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "Expert at finding educational resources. Provide real website URLs only."
-                    },
-                    {"role": "user", "content": fallback_prompt}
-                ],
-                max_tokens=200,
-                temperature=0.5
-            )
-            
-            fallback_result = fallback_response.choices[0].message.content.strip()
-            if fallback_result.startswith("```json"):
-                fallback_result = fallback_result[7:]
-            if fallback_result.startswith("```"):
-                fallback_result = fallback_result[3:]
-            if fallback_result.endswith("```"):
-                fallback_result = fallback_result[:-3]
-            fallback_result = fallback_result.strip()
-            
-            fallback_resources = json.loads(fallback_result)
+            fallback_result = call_ai(fallback_prompt, "Expert at finding educational resources. Provide real website URLs only.", max_tokens=200, temperature=0.5)
+            fallback_resources = parse_json_response(fallback_result)
             for resource in fallback_resources:
                 url = resource.get("url", "")
                 if url and url.startswith("http"):
@@ -357,29 +322,8 @@ Respond in JSON format:
 
 JSON only:"""
 
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {
-                    "role": "system",
-                    "content": "Extract learning topic and requested numbers from user input. Return clean topic and numbers."
-                },
-                {"role": "user", "content": extraction_prompt}
-            ],
-            max_tokens=100,
-            temperature=0.1
-        )
-        
-        result = response.choices[0].message.content.strip()
-        if result.startswith("```json"):
-            result = result[7:]
-        if result.startswith("```"):
-            result = result[3:]
-        if result.endswith("```"):
-            result = result[:-3]
-        result = result.strip()
-        
-        extracted = json.loads(result)
+        result = call_ai(extraction_prompt, "Extract learning topic and requested numbers from user input. Return clean topic and numbers.", max_tokens=100, temperature=0.1)
+        extracted = parse_json_response(result)
         topic = extracted.get("topic", topic).strip()
         if extracted.get("num_resources"):
             requested_num = int(extracted["num_resources"])
@@ -405,20 +349,7 @@ Respond with ONLY:
 
 Your response:"""
 
-            response = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "Expert at determining reasonable resource counts for learning. Use common sense."
-                    },
-                    {"role": "user", "content": validation_prompt}
-                ],
-                max_tokens=50,
-                temperature=0.1
-            )
-            
-            result = response.choices[0].message.content.strip().upper()
+            result = call_ai(validation_prompt, "Expert at determining reasonable resource counts for learning. Use common sense.", max_tokens=50, temperature=0.1).upper()
             
             if result.startswith("REASONABLE"):
                 num_resources = requested_num
