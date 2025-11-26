@@ -71,28 +71,11 @@ def validate_learning_topic(topic: str) -> tuple[bool, str]:
     try:
         validation_prompt = f"""Analyze this learning topic: "{topic}"
 
-Check if this is a valid topic someone can learn about:
-
-1. Is it a real, meaningful topic? (not gibberish like "gfdnjlg nfgdsgdnjklgfnjs")
-2. Can someone actually learn about this? (not abstract concepts like "the meaning of life" or "what is love")
-3. Is it specific enough to create a learning plan? (not too vague like "stuff" or "things")
-4. Does it make sense as a learning subject? (not nonsensical combinations)
-
-Examples of VALID topics:
-- "Python programming" ✅
-- "Machine Learning" ✅
-- "Cooking Italian food" ✅
-- "Web Development" ✅
-- "Spanish language" ✅
-- "Photography" ✅
-
-Examples of INVALID topics:
-- "gfdnjlg nfgdsgdnjklgfnjs" ❌ (gibberish/nonsense)
-- "the meaning of life" ❌ (too abstract/philosophical)
-- "asdfghjkl" ❌ (random keyboard mashing)
-- "123456" ❌ (just numbers)
-- "what is love" ❌ (abstract concept, not a learnable skill)
-- "stuff" ❌ (too vague)
+Determine if this is a valid, learnable topic. Check for:
+- Real, meaningful content (not gibberish or random characters)
+- Learnable subject matter (not abstract philosophical concepts)
+- Sufficient specificity (not too vague)
+- Logical coherence
 
 Respond ONLY:
 - "VALID" if it's a real, learnable topic
@@ -122,7 +105,7 @@ Response:"""
             explanation = result.replace("INVALID", "").strip()
             if explanation.startswith(":"):
                 explanation = explanation[1:].strip()
-            return (False, explanation if explanation else "This doesn't seem like a valid learning topic. Please enter something specific you want to learn, like 'Python programming' or 'Cooking Italian food'.")
+            return (False, explanation if explanation else "This doesn't seem like a valid learning topic. Please enter something specific you want to learn.")
         else:
             # If response format is unexpected, be conservative and allow it
             # Better to let the system try than to block valid topics
@@ -314,27 +297,51 @@ JSON only:"""
         except Exception as e:
             print(f"Error in web scraping (non-critical): {e}")
     
-    # Final fallback if we still don't have enough - use real educational sites
+    # Final fallback if we still don't have enough - use AI to generate fallback resources
     if len(examples) == 0:
-        # Generate topic-specific fallback using real educational platforms
-        topic_slug = topic.replace(' ', '-').lower()
-        examples = [
-            {
-                "title": f"{topic} - Wikipedia",
-                "url": f"https://en.wikipedia.org/wiki/{topic.replace(' ', '_')}",
-                "description": f"Learn the basics of {topic} on Wikipedia"
-            },
-            {
-                "title": f"{topic} - Khan Academy",
-                "url": f"https://www.khanacademy.org/search?page_search_query={topic.replace(' ', '+')}",
-                "description": f"Free courses and tutorials on {topic}"
-            },
-            {
-                "title": f"{topic} - Coursera",
-                "url": f"https://www.coursera.org/courses?query={topic.replace(' ', '+')}",
-                "description": f"Online courses on {topic}"
-            }
-        ]
+        try:
+            # Use AI to suggest fallback educational resources
+            fallback_prompt = f"""Suggest 3 general educational resources for learning about: {topic}
+
+Provide real educational websites, documentation, or learning platforms.
+
+JSON: [{{"title": "Resource Name", "url": "https://real-site.com", "description": "Brief"}}, ...]
+
+JSON only:"""
+            
+            fallback_response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "Expert at finding educational resources. Provide real website URLs only."
+                    },
+                    {"role": "user", "content": fallback_prompt}
+                ],
+                max_tokens=200,
+                temperature=0.5
+            )
+            
+            fallback_result = fallback_response.choices[0].message.content.strip()
+            if fallback_result.startswith("```json"):
+                fallback_result = fallback_result[7:]
+            if fallback_result.startswith("```"):
+                fallback_result = fallback_result[3:]
+            if fallback_result.endswith("```"):
+                fallback_result = fallback_result[:-3]
+            fallback_result = fallback_result.strip()
+            
+            fallback_resources = json.loads(fallback_result)
+            for resource in fallback_resources:
+                url = resource.get("url", "")
+                if url and url.startswith("http"):
+                    examples.append({
+                        "title": resource.get("title", f"{topic} Resource"),
+                        "url": url,
+                        "description": resource.get("description", f"Learn about {topic}")
+                    })
+        except Exception as e:
+            print(f"Error generating fallback resources: {e}")
     
     return examples[:num_examples]
 
@@ -400,18 +407,14 @@ def extract_topic_and_num_resources(topic: str) -> tuple[str, int, str, int]:
     # Use AI to determine if the requested number is reasonable
     if requested_num is not None:
         try:
-            validation_prompt = f"""A user requested {requested_num} resources/examples for learning about a topic.
+            validation_prompt = f"""A user requested {requested_num} resources/examples for learning.
 
-Is this a reasonable number? Consider:
-- Too few (1-2): Not enough variety
-- Reasonable (3-15): Good for learning, manageable to review
-- Many (16-30): Still reasonable but might be overwhelming
-- Too many (31+): Likely too overwhelming, hard to process, may not be useful
+Is this reasonable? Consider if it's too few, too many, or just right for effective learning.
 
 Respond with ONLY:
-- "REASONABLE: {requested_num}" if it's reasonable
-- "TOO_MANY: [suggested_number]" if it's too many (suggest a reasonable alternative like 15 or 20)
-- "TOO_FEW: [suggested_number]" if it's too few (suggest at least 3)
+- "REASONABLE: {requested_num}" if reasonable
+- "TOO_MANY: [suggested_number]" if too many (suggest alternative)
+- "TOO_FEW: [suggested_number]" if too few (suggest minimum)
 
 Your response:"""
 
@@ -420,7 +423,7 @@ Your response:"""
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are an expert at determining reasonable resource counts for learning. Use common sense - too many resources can be overwhelming and counterproductive."
+                        "content": "Expert at determining reasonable resource counts for learning. Use common sense."
                     },
                     {"role": "user", "content": validation_prompt}
                 ],
@@ -433,33 +436,24 @@ Your response:"""
             if result.startswith("REASONABLE"):
                 num_resources = requested_num
             elif result.startswith("TOO_MANY"):
-                # Extract suggested number
                 suggested_match = re.search(r'(\d+)', result)
                 if suggested_match:
                     num_resources = int(suggested_match.group(1))
                     message = f"You requested {requested_num} resources, but that might be overwhelming. I'll provide {num_resources} high-quality resources instead."
                 else:
-                    num_resources = 20  # Default cap
-                    message = f"You requested {requested_num} resources, but that's too many to be useful. I'll provide {num_resources} high-quality resources instead."
+                    num_resources = requested_num  # Use requested if can't parse
             elif result.startswith("TOO_FEW"):
                 suggested_match = re.search(r'(\d+)', result)
                 if suggested_match:
                     num_resources = int(suggested_match.group(1))
                     message = f"You requested {requested_num} resources, but that's not enough. I'll provide {num_resources} resources instead."
                 else:
-                    num_resources = 5
+                    num_resources = requested_num  # Use requested if can't parse
             else:
-                # Fallback: use requested number but cap at 30
-                num_resources = min(requested_num, 30)
-                if requested_num > 30:
-                    message = f"You requested {requested_num} resources. I'll provide {num_resources} high-quality resources to keep it manageable."
+                num_resources = requested_num  # Default to requested
         except Exception as e:
             print(f"Error validating resource count: {e}")
-            # Fallback: use requested number but cap at 30
-            if requested_num:
-                num_resources = min(requested_num, 30)
-                if requested_num > 30:
-                    message += f"You requested {requested_num} resources. I'll provide {num_resources} high-quality resources to keep it manageable."
+            num_resources = requested_num  # Fallback to requested
     
     return topic, num_resources, message.strip(), num_steps
 
@@ -483,7 +477,7 @@ async def create_learning_experience(request: LearningRequest):
     if not is_valid:
         raise HTTPException(
             status_code=400,
-            detail=validation_message or "This doesn't seem like a valid learning topic. Please enter something specific you want to learn, like 'Python programming' or 'Cooking Italian food'."
+            detail=validation_message or "This doesn't seem like a valid learning topic. Please enter something specific you want to learn."
         )
     
     try:
