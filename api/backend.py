@@ -158,12 +158,9 @@ async def generate_learning_plan(topic: str, num_steps: int = None) -> List[Dict
             step_count = str(num_steps)
             step_instruction = f"Provide exactly {num_steps} steps. Make sure the plan is comprehensive but fits within {num_steps} steps."
         
-        prompt = f"""Create a learning plan for: {topic}
+        prompt = f"""Learning plan for: {topic}
 
-{step_instruction} Format as JSON array with "title" and "description" fields.
-
-Example:
-[{{"title": "Step 1: Basics", "description": "Learn fundamentals..."}}, {{"title": "Step 2: Practice", "description": "Try examples..."}}]
+{step_instruction} JSON array: [{{"title": "Step 1", "description": "..."}}, ...]
 
 JSON only:"""
 
@@ -172,12 +169,12 @@ JSON only:"""
             messages=[
                 {
                     "role": "system",
-                    "content": "You are an expert educator. Respond with valid JSON only."
+                    "content": "Expert educator. JSON only."
                 },
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=800,  # Reduced from 1000 for speed
-            temperature=0.7
+            max_tokens=600,  # Further reduced for speed
+            temperature=0.6  # Lower for faster responses
         )
         
         result = response.choices[0].message.content.strip()
@@ -212,29 +209,23 @@ async def scrape_examples(topic: str, num_examples: int = 3) -> List[Dict[str, s
     # OPTIMIZATION: Use AI first (faster and more reliable than web scraping)
     try:
         # Use GPT to suggest relevant resources quickly
-        prompt = f"""Suggest {num_examples} specific, real online resources for learning: {topic}
+        prompt = f"""Suggest {num_examples} resources for: {topic}
 
-For each, provide:
-- Website/tool name
-- Realistic URL (can be search URL if specific unknown)
-- Brief description
+JSON: [{{"title": "Name", "url": "https://example.com", "description": "Brief"}}, ...]
 
-JSON array format:
-[{{"title": "Name", "url": "https://example.com", "description": "Brief"}}, ...]
-
-JSON only, no markdown:"""
+JSON only:"""
 
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
                 {
                     "role": "system",
-                    "content": "You are an expert at finding learning resources. Suggest real, specific websites, tutorials, courses, or documentation."
+                    "content": "Expert at finding learning resources. JSON only."
                 },
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=400,  # Reduced from 500 for speed
-            temperature=0.7
+            max_tokens=300,  # Further reduced for speed
+            temperature=0.6  # Lower for faster responses
         )
         
         result = response.choices[0].message.content.strip()
@@ -488,15 +479,29 @@ async def create_learning_experience(request: LearningRequest):
     try:
         # Generate learning plan and scrape examples in parallel for speed
         # Use clean topic for plan generation, pass num_steps if specified
-        plan_task = generate_learning_plan(clean_topic, num_steps=num_steps)
-        examples_task = scrape_examples(clean_topic, num_examples=num_resources)
+        # Add timeout wrapper to ensure we never exceed 8 seconds total
+        async def run_with_timeout():
+            plan_task = generate_learning_plan(clean_topic, num_steps=num_steps)
+            examples_task = scrape_examples(clean_topic, num_examples=num_resources)
+            
+            # Run both in parallel with 7.5 second timeout (leaving 0.5s buffer)
+            plan, examples = await asyncio.wait_for(
+                asyncio.gather(plan_task, examples_task),
+                timeout=7.5
+            )
+            return plan, examples
         
-        plan, examples = await asyncio.gather(plan_task, examples_task)
+        plan, examples = await run_with_timeout()
         
         return LearningPlanResponse(
             plan=plan,
             examples=examples,
             message=resource_message
+        )
+    except asyncio.TimeoutError:
+        raise HTTPException(
+            status_code=504, 
+            detail="Request timed out. Please try again with a simpler topic or fewer resources."
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error creating learning experience: {str(e)}")
@@ -510,13 +515,13 @@ async def expand_learning_step(topic: str, step_title: str, step_description: st
         prompt = f"""Topic: {topic}
 Step: {step_title} - {step_description}
 
-Provide complementary details (don't repeat). JSON format:
+Complementary details (don't repeat). JSON:
 {{
-  "additionalContext": "Brief context not covered...",
-  "practicalDetails": ["Detail 1", "Detail 2", "Detail 3"],
-  "importantConsiderations": ["Consideration 1", "Consideration 2"],
-  "realWorldExamples": ["Example 1", "Example 2"],
-  "potentialChallenges": ["Challenge with solution 1", "Challenge with solution 2"]
+  "additionalContext": "Brief context...",
+  "practicalDetails": ["Detail 1", "Detail 2"],
+  "importantConsiderations": ["Consideration 1"],
+  "realWorldExamples": ["Example 1"],
+  "potentialChallenges": ["Challenge with solution"]
 }}
 
 JSON only:"""
@@ -526,12 +531,12 @@ JSON only:"""
             messages=[
                 {
                     "role": "system",
-                    "content": "Expert educator. Provide complementary learning details. JSON only."
+                    "content": "Expert educator. JSON only."
                 },
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=500,  # Reduced from 800 for speed
-            temperature=0.6  # Slightly lower for faster, more consistent responses
+            max_tokens=400,  # Further reduced for speed
+            temperature=0.5  # Lower for faster responses
         )
         
         result = response.choices[0].message.content.strip()
@@ -580,12 +585,21 @@ async def expand_step(request: ExpandStepRequest):
         raise HTTPException(status_code=500, detail="OPENAI_API_KEY not configured")
     
     try:
-        expanded = await expand_learning_step(
-            request.topic,
-            request.step_title,
-            request.step_description
+        # Add timeout to ensure we never exceed 7.5 seconds
+        expanded = await asyncio.wait_for(
+            expand_learning_step(
+                request.topic,
+                request.step_title,
+                request.step_description
+            ),
+            timeout=7.5
         )
         return expanded
+    except asyncio.TimeoutError:
+        raise HTTPException(
+            status_code=504,
+            detail="Request timed out. Please try again."
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error expanding learning step: {str(e)}")
 
