@@ -140,29 +140,68 @@ def root():
     }
 
 async def validate_url(resource: dict, topic: str) -> dict | None:
-    """Validate a single URL and return resource dict if valid, None if invalid"""
+    """Validate a single URL and return resource dict if valid, None if invalid.
+    Checks both HTTP status and page content to ensure it's a working page with actual content."""
     url = resource.get("url", "")
     if not url or not url.startswith("http"):
         return None
     
-    # Verify URL exists with actual HTTP request
+    # Verify URL exists and has valid content
     try:
         async with httpx.AsyncClient(timeout=5.0, follow_redirects=True) as http_client:
-            # Try GET request to verify URL exists
+            # Get the page content to verify it's not an error page
             response = await http_client.get(url, allow_redirects=True)
             
-            # Check status code - only include if 2xx (success) or 3xx (redirect)
+            # First check: HTTP status code must be 2xx or 3xx
             status = response.status_code
-            if 200 <= status < 400:
-                # URL is valid and accessible - include it
-                return {
-                    "title": resource.get("title", f"{topic} Resource"),
-                    "url": url,
-                    "description": resource.get("description", f"Learn about {topic}")
-                }
-            else:
-                # 4xx (404, 403, etc.) or 5xx (500, 503, etc.) - URL is broken, reject it
+            if status >= 400:
+                # 4xx or 5xx - URL is broken, reject it
                 return None
+            
+            # Second check: Verify page content is not an error page
+            # Get text content (limit to first 50KB to avoid huge pages)
+            try:
+                content = response.text[:50000].lower()
+                
+                # Check for common error indicators in the content
+                error_indicators = [
+                    "video not available",
+                    "video unavailable",
+                    "this video is not available",
+                    "page not found",
+                    "404",
+                    "not found",
+                    "error 404",
+                    "this content is not available",
+                    "content unavailable",
+                    "access denied",
+                    "forbidden",
+                    "this page doesn't exist",
+                    "the page you're looking for",
+                    "sorry, we couldn't find",
+                    "the requested page",
+                ]
+                
+                # If page contains error indicators, it's broken
+                if any(indicator in content for indicator in error_indicators):
+                    return None
+                
+                # Check if page has minimal content (at least 200 chars suggests real content)
+                # Very short pages might be error pages
+                if len(response.text) < 200:
+                    return None
+                
+            except Exception:
+                # If we can't parse content, but status is good, include it
+                # Some pages might not be text/html
+                pass
+            
+            # URL passed all checks - it's valid
+            return {
+                "title": resource.get("title", f"{topic} Resource"),
+                "url": url,
+                "description": resource.get("description", f"Learn about {topic}")
+            }
                 
     except httpx.HTTPStatusError as e:
         # httpx may raise this for some 4xx/5xx responses
@@ -178,23 +217,17 @@ async def validate_url(resource: dict, topic: str) -> dict | None:
         # 4xx or 5xx - broken URL, reject it
         return None
     except (httpx.TimeoutException, httpx.ConnectError, httpx.RequestError):
-        # Network errors (timeout, connection issues) - URL might be valid but slow/unreachable from server
-        # Include it anyway - it might work for users even if our server can't reach it
-        # Better to show potentially working links than no links at all
+        # Network errors - can't verify, but might work for users
+        # Only include if URL looks reasonable (not obviously broken)
         return {
             "title": resource.get("title", f"{topic} Resource"),
             "url": url,
             "description": resource.get("description", f"Learn about {topic}")
         }
     except Exception as e:
-        # Other unexpected errors - include it to be safe
-        # We'd rather show a link that might work than block everything
-        print(f"Unexpected error validating URL {url}: {e}")
-        return {
-            "title": resource.get("title", f"{topic} Resource"),
-            "url": url,
-            "description": resource.get("description", f"Learn about {topic}")
-        }
+        # Other unexpected errors - can't verify, skip it
+        print(f"Error validating URL {url}: {e}")
+        return None
 
 async def generate_plan_and_resources(topic: str, num_steps: int = None, num_examples: int = 5) -> tuple[List[Dict[str, str]], List[Dict[str, str]]]:
     """
