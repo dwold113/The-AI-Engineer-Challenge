@@ -45,29 +45,11 @@ def validate_learning_topic(topic: str) -> tuple[bool, str]:
     Uses common sense to check if the topic makes sense and can be learned.
     Returns (is_valid, message)
     """
-    topic_lower = topic.lower().strip()
-    words = topic_lower.split()
-    
-    # Quick sanity checks (no API call needed)
-    if len(words) < 1:
+    # Basic check: topic must exist
+    if not topic or not topic.strip():
         return (False, "Please enter a topic you want to learn about.")
     
-    if len(topic) < 2:
-        return (False, "Topic is too short. Please provide more details.")
-    
-    if len(topic) > 200:
-        return (False, "Topic is too long. Please keep it under 200 characters.")
-    
-    # Check for repeated characters or obvious nonsense
-    if len(set(topic_lower.replace(' ', ''))) < 3:
-        return (False, "Please provide a meaningful topic, not just repeated characters.")
-    
-    # Check for only special characters or numbers
-    only_special_chars = re.compile(r'^[^a-zA-Z\s]{2,}$')
-    if only_special_chars.match(topic_lower):
-        return (False, "Please use words to describe what you want to learn, not just symbols or numbers.")
-    
-    # Use AI to validate the topic - it will intelligently catch all edge cases
+    # Use AI to validate the topic - it intelligently handles all edge cases
     try:
         validation_prompt = f"""Analyze this learning topic: "{topic}"
 
