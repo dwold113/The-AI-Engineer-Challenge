@@ -136,7 +136,7 @@ def root():
     return {
         "status": "ok",
         "openai_api_key_configured": api_key_set,
-        "app": "Learning Experience App"
+        "app": "AI Learning Experience App"
     }
 
 async def generate_plan_and_resources(topic: str, num_steps: int = None, num_examples: int = 5) -> tuple[List[Dict[str, str]], List[Dict[str, str]]]:

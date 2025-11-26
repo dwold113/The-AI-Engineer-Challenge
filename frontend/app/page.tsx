@@ -164,7 +164,7 @@ export default function Home() {
         <div className="text-center mb-16 animate-fade-in">
           <div className="inline-block mb-6">
             <h1 className="text-6xl md:text-7xl font-extrabold mb-4 bg-gradient-to-r from-purple-400 via-pink-400 to-blue-400 bg-clip-text text-transparent animate-gradient">
-              Learning Experience
+              AI Learning Experience
             </h1>
             <div className="h-1 w-24 bg-gradient-to-r from-purple-500 to-blue-500 mx-auto rounded-full"></div>
           </div>
