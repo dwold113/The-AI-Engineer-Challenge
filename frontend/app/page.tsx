@@ -43,6 +43,7 @@ const validatePrompt = (prompt: string): { valid: boolean; error?: string } => {
 export default function Home() {
   const [prompt, setPrompt] = useState('')
   const [imageUrl, setImageUrl] = useState<string | null>(null)
+  const [isGeneratedImage, setIsGeneratedImage] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
@@ -70,6 +71,7 @@ export default function Home() {
     setIsGenerating(true)
     setError(null)
     setImageUrl(null) // Clear previous image
+    setIsGeneratedImage(false)
 
     try {
       console.log('Calling API:', `${API_URL}/api/generate-image`)
@@ -118,6 +120,7 @@ export default function Home() {
       const data = await response.json()
       console.log('Image URL received:', data.image_url)
       setImageUrl(data.image_url)
+      setIsGeneratedImage(true) // Mark as AI-generated image
     } catch (err) {
       let errorMessage = 'An error occurred'
       
@@ -230,7 +233,7 @@ export default function Home() {
 
   return (
     <div style={{ position: 'relative', minHeight: '100vh', width: '100vw' }}>
-      <BackgroundImage imageUrl={imageUrl} />
+      <BackgroundImage imageUrl={imageUrl} isGenerated={isGeneratedImage} />
       <main className="relative min-h-screen" style={{ backgroundColor: 'transparent', position: 'relative', zIndex: 1 }}>
         <div className="relative z-10 flex flex-col items-center justify-center min-h-screen p-8" style={{ minHeight: '100vh' }}>
         <div className="w-full max-w-2xl">
@@ -247,6 +250,7 @@ export default function Home() {
                     setMode('generate')
                     setError(null)
                     setImageUrl(null)
+                    setIsGeneratedImage(false)
                   }}
                   className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all ${
                     mode === 'generate'
@@ -261,6 +265,7 @@ export default function Home() {
                     setMode('upload')
                     setError(null)
                     setImageUrl(null)
+                    setIsGeneratedImage(false)
                   }}
                   className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all ${
                     mode === 'upload'

@@ -4,9 +4,10 @@ import { useEffect, useState, memo } from 'react'
 
 interface BackgroundImageProps {
   imageUrl: string | null
+  isGenerated?: boolean // true for AI-generated images, false/undefined for uploaded
 }
 
-function BackgroundImage({ imageUrl }: BackgroundImageProps) {
+function BackgroundImage({ imageUrl, isGenerated = false }: BackgroundImageProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [imageLoaded, setImageLoaded] = useState(false)
@@ -120,12 +121,10 @@ function BackgroundImage({ imageUrl }: BackgroundImageProps) {
   // Smart fit mode logic:
   // - AI-generated images: ALWAYS use 'cover' to fill entire screen
   // - Uploaded images/GIFs: Use smart judgment based on aspect ratio
-  const isUploadedImage = imageUrl?.startsWith('data:')
-  
   let useContain = false
   
   if (imageAspectRatio !== null) {
-    if (!isUploadedImage) {
+    if (isGenerated) {
       // AI-generated images: ALWAYS cover the full screen
       useContain = false
     } else {
