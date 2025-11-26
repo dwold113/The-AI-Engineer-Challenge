@@ -508,8 +508,10 @@ Complementary details. JSON:
   "practicalDetails": ["Detail 1", "Detail 2"],
   "importantConsiderations": ["Consideration 1"],
   "realWorldExamples": ["Example 1"],
-  "potentialChallenges": ["Challenge with solution"]
+  "potentialChallenges": ["Challenge 1: Solution description", "Challenge 2: Solution description"]
 }}
+
+IMPORTANT: All fields must be arrays of STRINGS only. potentialChallenges should be strings like "Challenge: Solution", not objects.
 
 JSON only:"""
 
@@ -538,6 +540,31 @@ JSON only:"""
         result = result.strip()
         
         expanded = json.loads(result)
+        
+        # Ensure all array fields are arrays of strings (not objects)
+        # Fix potentialChallenges if AI returned objects instead of strings
+        if "potentialChallenges" in expanded and expanded["potentialChallenges"]:
+            fixed_challenges = []
+            for item in expanded["potentialChallenges"]:
+                if isinstance(item, str):
+                    fixed_challenges.append(item)
+                elif isinstance(item, dict):
+                    # Convert object to string format
+                    challenge = item.get('challenge', 'Challenge')
+                    solution = item.get('solution', 'Solution')
+                    fixed_challenges.append(f"{challenge}: {solution}")
+                else:
+                    fixed_challenges.append(str(item))
+            expanded["potentialChallenges"] = fixed_challenges
+        
+        # Ensure all other array fields are strings
+        for field in ["practicalDetails", "importantConsiderations", "realWorldExamples"]:
+            if field in expanded and expanded[field]:
+                expanded[field] = [
+                    item if isinstance(item, str) else str(item)
+                    for item in expanded[field]
+                ]
+        
         return expanded
     except Exception as e:
         print(f"Error expanding learning step: {e}")
