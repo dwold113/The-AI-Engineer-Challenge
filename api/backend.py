@@ -139,6 +139,59 @@ def root():
         "app": "AI Learning Experience App"
     }
 
+async def validate_url(resource: dict, topic: str) -> dict | None:
+    """Validate a single URL and return resource dict if valid, None if invalid"""
+    url = resource.get("url", "")
+    if not url or not url.startswith("http"):
+        return None
+    
+    # Verify URL exists with actual HTTP request
+    try:
+        async with httpx.AsyncClient(timeout=3.0, follow_redirects=True) as http_client:
+            # Try GET directly (more reliable than HEAD for many sites)
+            try:
+                response = await http_client.get(url, allow_redirects=True)
+                # Only include if URL returns success (2xx) or redirect (3xx)
+                if 200 <= response.status_code < 400:
+                    return {
+                        "title": resource.get("title", f"{topic} Resource"),
+                        "url": url,
+                        "description": resource.get("description", f"Learn about {topic}")
+                    }
+                else:
+                    # Explicit 4xx or 5xx - URL is broken, don't include
+                    return None
+            except httpx.HTTPStatusError as e:
+                # Check if it's a 4xx/5xx error (broken) vs other HTTP error
+                if hasattr(e, 'response'):
+                    status = e.response.status_code
+                    if 200 <= status < 400:
+                        # Actually valid, include it
+                        return {
+                            "title": resource.get("title", f"{topic} Resource"),
+                            "url": url,
+                            "description": resource.get("description", f"Learn about {topic}")
+                        }
+                    else:
+                        # 4xx or 5xx - broken URL
+                        return None
+                return None
+    except (httpx.TimeoutException, httpx.ConnectError, httpx.RequestError):
+        # Network errors - URL might be valid but slow/unreachable
+        # For now, include it (better to show potentially working links than none)
+        return {
+            "title": resource.get("title", f"{topic} Resource"),
+            "url": url,
+            "description": resource.get("description", f"Learn about {topic}")
+        }
+    except Exception:
+        # Other errors - be lenient, include it
+        return {
+            "title": resource.get("title", f"{topic} Resource"),
+            "url": url,
+            "description": resource.get("description", f"Learn about {topic}")
+        }
+
 async def generate_plan_and_resources(topic: str, num_steps: int = None, num_examples: int = 5) -> tuple[List[Dict[str, str]], List[Dict[str, str]]]:
     """
     OPTIMIZED: Combined function that generates both learning plan and resources in a single AI call.
@@ -191,62 +244,8 @@ JSON only:"""
         resources = data.get("resources", [])
         
         # Process resources - validate URLs actually exist (in parallel for speed)
-        async def validate_url(resource: dict) -> dict | None:
-            """Validate a single URL and return resource dict if valid, None if invalid"""
-            url = resource.get("url", "")
-            if not url or not url.startswith("http"):
-                return None
-            
-            # Verify URL exists with actual HTTP request
-            try:
-                async with httpx.AsyncClient(timeout=3.0, follow_redirects=True) as http_client:
-                    # Try GET directly (more reliable than HEAD for many sites)
-                    try:
-                        response = await http_client.get(url, allow_redirects=True)
-                        # Only include if URL returns success (2xx) or redirect (3xx)
-                        if 200 <= response.status_code < 400:
-                            return {
-                                "title": resource.get("title", f"{topic} Resource"),
-                                "url": url,
-                                "description": resource.get("description", f"Learn about {topic}")
-                            }
-                        else:
-                            # Explicit 4xx or 5xx - URL is broken, don't include
-                            return None
-                    except httpx.HTTPStatusError as e:
-                        # Check if it's a 4xx/5xx error (broken) vs other HTTP error
-                        if hasattr(e, 'response'):
-                            status = e.response.status_code
-                            if 200 <= status < 400:
-                                # Actually valid, include it
-                                return {
-                                    "title": resource.get("title", f"{topic} Resource"),
-                                    "url": url,
-                                    "description": resource.get("description", f"Learn about {topic}")
-                                }
-                            else:
-                                # 4xx or 5xx - broken URL
-                                return None
-                        return None
-            except (httpx.TimeoutException, httpx.ConnectError, httpx.RequestError):
-                # Network errors - URL might be valid but slow/unreachable
-                # For now, include it (better to show potentially working links than none)
-                # In production, you might want to retry or be more selective
-                return {
-                    "title": resource.get("title", f"{topic} Resource"),
-                    "url": url,
-                    "description": resource.get("description", f"Learn about {topic}")
-                }
-            except Exception:
-                # Other errors - be lenient, include it
-                return {
-                    "title": resource.get("title", f"{topic} Resource"),
-                    "url": url,
-                    "description": resource.get("description", f"Learn about {topic}")
-                }
-        
         # Validate all URLs in parallel for speed
-        validation_tasks = [validate_url(resource) for resource in resources[:num_examples]]
+        validation_tasks = [validate_url(resource, topic) for resource in resources[:num_examples]]
         validation_results = await asyncio.gather(*validation_tasks, return_exceptions=True)
         
         # Collect valid results
@@ -348,7 +347,7 @@ JSON only:"""
                 fallback_resources = parse_json_response(fallback_result)
                 
                 # Validate fallback URLs in parallel
-                fallback_validation_tasks = [validate_url(resource) for resource in fallback_resources]
+                fallback_validation_tasks = [validate_url(resource, topic) for resource in fallback_resources]
                 fallback_results = await asyncio.gather(*fallback_validation_tasks, return_exceptions=True)
                 
                 for result in fallback_results:
