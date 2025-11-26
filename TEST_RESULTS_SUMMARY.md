@@ -3,7 +3,8 @@
 ## Executive Summary
 
 **Overall Test Results:**
-- ✅ **29 out of 30 prompt validation tests passed (96.7% success rate)**
+- ✅ **28 out of 30 prompt validation tests passed (93.3% success rate)**
+- ⚠️ **2 tests had issues:** One confirmed failure, one inconsistent (passed in test but failed for user)
 - ⚠️ **7 upload validation tests skipped (require actual files)**
 - 🎯 **AI validation is working correctly** - properly rejecting abstract/philosophical prompts
 
@@ -21,7 +22,8 @@ All valid visual prompts successfully generated images:
 4. ✅ **"abstract geometric patterns in blue and purple"** - Abstract but visual
 5. ✅ **"cozy coffee shop interior with warm lighting"** - Interior scene
 6. ✅ **"vintage library with bookshelves and reading nook"** - Detailed interior
-7. ✅ **"aurora borealis over snowy mountains"** - Natural phenomenon
+7. ⚠️ **"aurora borealis over snowy mountains"** - Natural phenomenon
+   - **Note:** Test showed success, but user reports failure. May be intermittent content policy issue.
 8. ✅ **"minimalist workspace with plants"** - Minimal but visual
 
 **Edge Cases (All Passed):**
@@ -70,13 +72,23 @@ The AI validation correctly rejected all invalid prompts:
 1. ✅ **"!!!@@@###$$$"** - Rejected: "Please provide more details"
 2. ✅ **"123456789"** - Rejected: "Please provide more details"
 
-### ⚠️ Failed Test (1/30)
+### ⚠️ Failed Tests (2/30)
 
 1. ❌ **"futuristic space station orbiting a planet"**
    - **Expected:** SUCCESS
    - **Actual:** FAILED - Error generating image
    - **Possible Cause:** Content policy violation or OpenAI API issue
    - **Note:** This is likely a DALL-E content policy issue, not a validation problem
+
+2. ⚠️ **"aurora borealis over snowy mountains"**
+   - **Expected:** SUCCESS
+   - **Test Result:** PASSED (status 200, image generated)
+   - **User Report:** FAILED
+   - **Possible Causes:** 
+     - Intermittent content policy enforcement
+     - Rate limiting or API timeout
+     - Different behavior between test environment and production
+   - **Note:** Test succeeded but user experienced failure - may be inconsistent API behavior
 
 ---
 
@@ -148,7 +160,7 @@ The upload validation tests require actual image files to test. The frontend val
 | **Invalid Prompts** | 21 | 21 | 0 | 100% |
 | **Edge Cases** | 4 | 4 | 0 | 100% |
 | **API Errors** | 1 | 0 | 1 | 0% |
-| **Total Prompt Tests** | 30 | 29 | 1 | **96.7%** |
+| **Total Prompt Tests** | 30 | 28 | 2 | **93.3%** |
 | **Upload Tests** | 7 | 0 | 0 | N/A (Skipped) |
 
 ---
