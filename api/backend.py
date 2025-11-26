@@ -74,6 +74,12 @@ def validate_prompt_makes_sense(prompt: str) -> tuple[bool, str]:
     if len(set(prompt_lower.replace(' ', ''))) < 3:
         return (False, "Please provide a meaningful description, not just repeated characters.")
     
+    # Check if user is requesting a GIF/animated image
+    # DALL-E 3 only generates static images, not animated GIFs
+    gif_keywords = ['gif', 'animated', 'animation', 'moving', 'video']
+    if any(keyword in prompt_lower for keyword in gif_keywords):
+        return (False, "DALL-E can only generate static images, not animated GIFs. Try describing the scene instead, like 'a boy dancing' or 'a dancing boy in motion'. You can upload your own GIF files using the 'Upload Image' option.")
+    
     # Use AI to determine if the prompt can be visualized
     try:
         validation_prompt = f"""Analyze this image generation prompt step by step:
@@ -199,4 +205,6 @@ async def generate_image(request: ImageRequest):
                 status_code=400,
                 detail="The prompt doesn't make sense or is invalid. Please provide a clearer description of the background you want."
             )
+        # Note: DALL-E may generate images for prompts with specific people, but they won't be accurate
+        # The validation step should catch these, but if it gets through, we let DALL-E try
         raise HTTPException(status_code=500, detail=f"Error generating image: {str(e)}")
