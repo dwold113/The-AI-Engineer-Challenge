@@ -33,6 +33,11 @@ class LearningPlanResponse(BaseModel):
     plan: List[Dict[str, str]]
     examples: List[Dict[str, str]]
 
+class ExpandStepRequest(BaseModel):
+    topic: str
+    step_title: str
+    step_description: str
+
 def validate_learning_topic(topic: str) -> tuple[bool, str]:
     """
     Use AI to determine if a topic is valid for learning.
@@ -335,6 +340,95 @@ async def create_learning_experience(request: LearningRequest):
 # Keep old endpoints for backward compatibility (can remove later)
 class ChatRequest(BaseModel):
     message: str
+
+async def expand_learning_step(topic: str, step_title: str, step_description: str) -> Dict[str, any]:
+    """
+    Generate deeper, more detailed information for a specific learning step.
+    Returns sub-steps, detailed explanations, and specific resources.
+    """
+    try:
+        prompt = f"""The user is learning about: {topic}
+
+They want to dive deeper into this step:
+Title: {step_title}
+Description: {step_description}
+
+Provide a detailed expansion with:
+1. 3-5 sub-steps they should follow
+2. A more detailed explanation of what to do
+3. Specific tips and best practices
+4. Common mistakes to avoid
+
+Format your response as JSON with this structure:
+{{
+  "subSteps": [
+    {{"title": "Sub-step title", "description": "What to do"}},
+    ...
+  ],
+  "detailedExplanation": "A comprehensive explanation of this step...",
+  "tips": ["Tip 1", "Tip 2", "Tip 3"],
+  "commonMistakes": ["Mistake 1", "Mistake 2"]
+}}
+
+Your response (JSON only, no markdown):"""
+
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are an expert educator who provides detailed, actionable learning guidance. Always respond with valid JSON only."
+                },
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=800,
+            temperature=0.7
+        )
+        
+        result = response.choices[0].message.content.strip()
+        
+        # Remove markdown code blocks if present
+        if result.startswith("```json"):
+            result = result[7:]
+        if result.startswith("```"):
+            result = result[3:]
+        if result.endswith("```"):
+            result = result[:-3]
+        result = result.strip()
+        
+        expanded = json.loads(result)
+        return expanded
+    except Exception as e:
+        print(f"Error expanding learning step: {e}")
+        # Fallback response
+        return {
+            "subSteps": [
+                {"title": "Research the topic", "description": f"Start by researching {step_title} in detail."},
+                {"title": "Find examples", "description": "Look for real-world examples and case studies."},
+                {"title": "Practice", "description": "Try applying what you've learned through hands-on practice."}
+            ],
+            "detailedExplanation": f"This step involves {step_description}. Take your time to understand the concepts thoroughly before moving on.",
+            "tips": ["Take notes as you learn", "Practice regularly", "Ask questions when stuck"],
+            "commonMistakes": ["Rushing through without understanding", "Skipping practice exercises"]
+        }
+
+@app.post("/api/expand-step")
+async def expand_step(request: ExpandStepRequest):
+    """
+    Endpoint to get expanded, detailed information for a specific learning step.
+    """
+    if not os.getenv("OPENAI_API_KEY"):
+        raise HTTPException(status_code=500, detail="OPENAI_API_KEY not configured")
+    
+    try:
+        expanded = await expand_learning_step(
+            request.topic,
+            request.step_title,
+            request.step_description
+        )
+        return expanded
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error expanding learning step: {str(e)}")
 
 @app.post("/api/chat")
 def chat(request: ChatRequest):

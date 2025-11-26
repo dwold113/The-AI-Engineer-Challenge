@@ -20,12 +20,21 @@ interface LearningResponse {
   examples: Example[]
 }
 
+interface ExpandedStep {
+  subSteps: Array<{ title: string; description: string }>
+  detailedExplanation: string
+  tips: string[]
+  commonMistakes: string[]
+}
+
 export default function Home() {
   const [topic, setTopic] = useState('')
   const [learningData, setLearningData] = useState<LearningResponse | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
+  const [expandedSteps, setExpandedSteps] = useState<Record<number, ExpandedStep>>({})
+  const [expandingStep, setExpandingStep] = useState<number | null>(null)
 
   useEffect(() => {
     setMounted(true)
@@ -184,25 +193,115 @@ export default function Home() {
                 </h2>
               </div>
               <div className="space-y-5">
-                {learningData.plan.map((step, index) => (
-                  <div
-                    key={index}
-                    className="bg-gradient-to-br from-white/5 to-white/0 rounded-xl p-6 md:p-7 border border-white/10 hover:border-purple-400/50 hover:bg-white/10 transition-all duration-300 group hover:shadow-xl hover:shadow-purple-500/10 animate-slide-in"
-                    style={{ animationDelay: `${index * 100}ms` }}
-                  >
-                    <div className="flex items-start gap-5">
-                      <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 via-pink-500 to-blue-500 flex items-center justify-center font-bold text-xl shadow-lg group-hover:scale-110 transition-transform duration-300">
-                        {index + 1}
-                      </div>
-                      <div className="flex-1 pt-1">
-                        <h3 className="text-xl md:text-2xl font-bold mb-3 text-purple-200 group-hover:text-purple-100 transition-colors">
-                          {step.title}
-                        </h3>
-                        <p className="text-gray-300 leading-relaxed text-base md:text-lg">{step.description}</p>
+                {learningData.plan.map((step, index) => {
+                  const isExpanded = expandedSteps[index] !== undefined
+                  const isLoading = expandingStep === index
+                  
+                  return (
+                    <div
+                      key={index}
+                      className="bg-gradient-to-br from-white/5 to-white/0 rounded-xl p-6 md:p-7 border border-white/10 hover:border-purple-400/50 hover:bg-white/10 transition-all duration-300 group hover:shadow-xl hover:shadow-purple-500/10 animate-slide-in"
+                      style={{ animationDelay: `${index * 100}ms` }}
+                    >
+                      <div className="flex items-start gap-5">
+                        <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 via-pink-500 to-blue-500 flex items-center justify-center font-bold text-xl shadow-lg group-hover:scale-110 transition-transform duration-300">
+                          {index + 1}
+                        </div>
+                        <div className="flex-1 pt-1">
+                          <div className="flex items-start justify-between gap-4 mb-3">
+                            <div className="flex-1">
+                              <h3 className="text-xl md:text-2xl font-bold mb-2 text-purple-200 group-hover:text-purple-100 transition-colors">
+                                {step.title}
+                              </h3>
+                              <p className="text-gray-300 leading-relaxed text-base md:text-lg">{step.description}</p>
+                            </div>
+                            <button
+                              onClick={() => handleExpandStep(index, step)}
+                              disabled={isLoading}
+                              className="flex-shrink-0 px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 hover:border-purple-400/50 text-sm font-medium text-purple-200 hover:text-purple-100 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {isLoading ? (
+                                <span className="flex items-center gap-2">
+                                  <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                  </svg>
+                                  Loading...
+                                </span>
+                              ) : isExpanded ? (
+                                <span className="flex items-center gap-2">
+                                  <span>Show Less</span>
+                                  <span className="transform rotate-180 transition-transform">▼</span>
+                                </span>
+                              ) : (
+                                <span className="flex items-center gap-2">
+                                  <span>Dive Deeper</span>
+                                  <span>▼</span>
+                                </span>
+                              )}
+                            </button>
+                          </div>
+
+                          {/* Expanded Content */}
+                          {isExpanded && expandedSteps[index] && (
+                            <div className="mt-6 pt-6 border-t border-white/10 animate-fade-in space-y-6">
+                              {/* Detailed Explanation */}
+                              <div>
+                                <h4 className="text-lg font-semibold text-blue-300 mb-2">📚 Detailed Explanation</h4>
+                                <p className="text-gray-300 leading-relaxed">{expandedSteps[index].detailedExplanation}</p>
+                              </div>
+
+                              {/* Sub-Steps */}
+                              {expandedSteps[index].subSteps && expandedSteps[index].subSteps.length > 0 && (
+                                <div>
+                                  <h4 className="text-lg font-semibold text-blue-300 mb-3">🎯 Sub-Steps</h4>
+                                  <div className="space-y-3">
+                                    {expandedSteps[index].subSteps.map((subStep, subIndex) => (
+                                      <div key={subIndex} className="bg-white/5 rounded-lg p-4 border border-white/10">
+                                        <h5 className="font-semibold text-purple-200 mb-1">{subStep.title}</h5>
+                                        <p className="text-sm text-gray-400">{subStep.description}</p>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Tips */}
+                              {expandedSteps[index].tips && expandedSteps[index].tips.length > 0 && (
+                                <div>
+                                  <h4 className="text-lg font-semibold text-blue-300 mb-3">💡 Tips & Best Practices</h4>
+                                  <ul className="space-y-2">
+                                    {expandedSteps[index].tips.map((tip, tipIndex) => (
+                                      <li key={tipIndex} className="flex items-start gap-2 text-gray-300">
+                                        <span className="text-purple-400 mt-1">•</span>
+                                        <span>{tip}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+
+                              {/* Common Mistakes */}
+                              {expandedSteps[index].commonMistakes && expandedSteps[index].commonMistakes.length > 0 && (
+                                <div>
+                                  <h4 className="text-lg font-semibold text-blue-300 mb-3">⚠️ Common Mistakes to Avoid</h4>
+                                  <ul className="space-y-2">
+                                    {expandedSteps[index].commonMistakes.map((mistake, mistakeIndex) => (
+                                      <li key={mistakeIndex} className="flex items-start gap-2 text-gray-300">
+                                        <span className="text-red-400 mt-1">•</span>
+                                        <span>{mistake}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
 
