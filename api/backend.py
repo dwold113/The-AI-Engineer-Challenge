@@ -209,17 +209,11 @@ async def scrape_examples(topic: str, num_examples: int = 3) -> List[Dict[str, s
     # OPTIMIZATION: Use AI first (faster and more reliable than web scraping)
     try:
         # Use GPT to suggest relevant resources quickly
-        prompt = f"""Suggest {num_examples} specific, real learning resources for: {topic}
+        prompt = f"""Suggest {num_examples} real learning resources for: {topic}
 
-IMPORTANT:
-- Provide ACTUAL website URLs (e.g., docs.python.org, w3schools.com, github.com, coursera.org, khanacademy.org)
-- NO Google search URLs or generic search links
-- NO placeholder URLs like "https://example.com"
-- Use real, well-known educational websites, documentation sites, tutorials, courses, or GitHub repos
-- Each resource must be a specific, useful learning destination
+Provide actual educational websites, documentation, tutorials, or courses. Use real URLs only.
 
-JSON format:
-[{{"title": "Resource Name", "url": "https://actual-website.com/path", "description": "What you'll learn"}}, ...]
+JSON: [{{"title": "Name", "url": "https://real-site.com", "description": "Brief"}}, ...]
 
 JSON only:"""
 
@@ -228,12 +222,12 @@ JSON only:"""
             messages=[
                 {
                     "role": "system",
-                    "content": "You are an expert at finding real, specific learning resources. Always provide actual website URLs, never search URLs or placeholders. Suggest well-known educational sites, documentation, tutorials, courses, or GitHub repositories."
+                    "content": "Expert at finding real learning resources. Provide actual website URLs only."
                 },
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=300,  # Increased slightly to allow for better URLs
-            temperature=0.5  # Lower for faster responses
+            max_tokens=300,
+            temperature=0.5
         )
         
         result = response.choices[0].message.content.strip()
@@ -253,16 +247,13 @@ JSON only:"""
             url = resource.get("url", "")
             title = resource.get("title", f"{topic} Resource")
             
-            # Validate URL - reject Google search URLs and placeholders
-            if not url or "google.com/search" in url.lower() or "example.com" in url.lower() or not url.startswith("http"):
-                # Skip invalid URLs - don't add fallback Google search
-                continue
-            
-            examples.append({
-                "title": title,
-                "url": url,
-                "description": resource.get("description", f"Learn about {topic}")
-            })
+            # Simple validation: must be a valid HTTP(S) URL
+            if url and url.startswith("http"):
+                examples.append({
+                    "title": title,
+                    "url": url,
+                    "description": resource.get("description", f"Learn about {topic}")
+                })
     except Exception as e:
         print(f"Error generating AI resources: {e}")
     
