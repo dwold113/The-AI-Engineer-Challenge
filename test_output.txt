@@ -1,0 +1,102 @@
+🚀 Starting Learning Experience App Test Suite
+Backend URL: http://localhost:8000
+Frontend URL: http://localhost:3000
+
+🧪 Starting comprehensive test suite...
+
+📡 Testing Backend API...
+
+✅ Testing Valid Learning Topics...
+
+❌ Testing Invalid Learning Topics (should fail)...
+
+🔍 Testing Edge Cases...
+
+🔬 Testing Expand Step Functionality...
+
+🎨 Testing Frontend UI...
+
+⚡ Testing Performance...
+
+================================================================================
+📊 COMPREHENSIVE TEST REPORT
+================================================================================
+
+📈 SUMMARY
+  Total Tests: 40
+  ✅ Passed: 24
+  ❌ Failed: 16
+  📊 Pass Rate: 60.0%
+
+📂 BY CATEGORY
+  ⚠️ BACKEND: 12/13 passed (92.3%)
+  ⚠️ LEARNING_FLOW: 8/19 passed (42.1%)
+  ⚠️ EXPAND_STEP: 2/3 passed (66.7%)
+  ⚠️ FRONTEND: 0/2 passed (0.0%)
+  ⚠️ PERFORMANCE: 2/3 passed (66.7%)
+
+📋 DETAILED RESULTS
+--------------------------------------------------------------------------------
+
+❌ FAILED TESTS (16):
+  ❌ Valid topic: 3 steps requested (learning_flow)
+     Details: Failed to create plan. Status: 400
+  ❌ Valid topic: 10 resources requested (learning_flow)
+     Details: Failed to create plan. Status: 400
+  ❌ Valid topic: Both specified (learning_flow)
+     Details: Failed to create plan. Status: 400
+  ❌ Invalid topic rejected: Copyrighted content (backend)
+     Details: Status: 200
+  ❌ Edge case: Very long topic (learning_flow)
+     Details: Failed to create plan. Status: 400
+  ❌ Edge case: Unreasonable resource count (learning_flow)
+     Details: Failed to create plan. Status: 400
+  ❌ Edge case: Unreasonable step count (learning_flow)
+     Details: Failed to create plan. Status: 400
+  ❌ Edge case: Too few steps (learning_flow)
+     Details: Failed to create plan. Status: 400
+  ❌ Edge case: Unicode characters (learning_flow)
+     Details: Failed to create plan. Status: 400
+  ❌ Edge case: SQL injection attempt (learning_flow)
+     Details: Failed to create plan. Status: 400
+  ❌ Edge case: XSS attempt (learning_flow)
+     Details: Failed to create plan. Status: 400
+  ❌ Edge case: Very short valid (learning_flow)
+     Details: Failed to create plan. Status: 400
+  ❌ Expand with invalid step (expand_step)
+     Details: Step index 999 out of range (plan has 7 steps)
+  ❌ Frontend loads (frontend)
+     Details: Missing UI elements: ['Start Learning button', 'Input field']
+  ❌ Frontend has learning interface (frontend)
+     Details: Missing UI elements: ['Start Learning button', 'Input field']
+  ❌ Complex topic (performance)
+     Details: Exception: 
+
+✅ PASSED TESTS (24):
+  ✅ Root endpoint accessible (backend)
+  ✅ API key configured check (backend)
+  ✅ Valid topic: Python programming (learning_flow)
+  ✅ Valid topic: Machine Learning (learning_flow)
+  ✅ Valid topic: Web Development (learning_flow)
+  ✅ Valid topic: Cooking Italian food (learning_flow)
+  ✅ Valid topic: Spanish language (learning_flow)
+  ✅ Valid topic: Photography basics (learning_flow)
+  ✅ Invalid topic rejected: Gibberish (backend)
+  ✅ Invalid topic rejected: Abstract concept (backend)
+  ✅ Invalid topic rejected: Random chars (backend)
+  ✅ Invalid topic rejected: Just numbers (backend)
+  ✅ Invalid topic rejected: Too vague (backend)
+  ✅ Invalid topic rejected: Empty string (backend)
+  ✅ Invalid topic rejected: Single character (backend)
+  ✅ Invalid topic rejected: Only special chars (backend)
+  ✅ Invalid topic rejected: GIF request (backend)
+  ✅ Invalid topic rejected: Specific person (backend)
+  ✅ Edge case: Special characters in topic (learning_flow)
+  ✅ Edge case: Numbers in valid topic (learning_flow)
+  ... and 4 more passed tests
+
+💾 Reports saved:
+  - test_report_learning_app.json
+  - TEST_REPORT_LEARNING_APP.md
+
+================================================================================
