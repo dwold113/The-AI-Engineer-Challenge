@@ -149,48 +149,41 @@ async def validate_url(resource: dict, topic: str) -> dict | None:
     try:
         async with httpx.AsyncClient(timeout=3.0, follow_redirects=True) as http_client:
             # Try GET directly (more reliable than HEAD for many sites)
-            try:
-                response = await http_client.get(url, allow_redirects=True)
-                # Only include if URL returns success (2xx) or redirect (3xx)
-                if 200 <= response.status_code < 400:
-                    return {
-                        "title": resource.get("title", f"{topic} Resource"),
-                        "url": url,
-                        "description": resource.get("description", f"Learn about {topic}")
-                    }
-                else:
-                    # Explicit 4xx or 5xx - URL is broken, don't include
-                    return None
-            except httpx.HTTPStatusError as e:
-                # Check if it's a 4xx/5xx error (broken) vs other HTTP error
-                if hasattr(e, 'response'):
-                    status = e.response.status_code
-                    if 200 <= status < 400:
-                        # Actually valid, include it
-                        return {
-                            "title": resource.get("title", f"{topic} Resource"),
-                            "url": url,
-                            "description": resource.get("description", f"Learn about {topic}")
-                        }
-                    else:
-                        # 4xx or 5xx - broken URL
-                        return None
+            response = await http_client.get(url, allow_redirects=True)
+            
+            # Check status code - only include if 2xx (success) or 3xx (redirect)
+            status = response.status_code
+            if 200 <= status < 400:
+                # URL is valid and accessible
+                return {
+                    "title": resource.get("title", f"{topic} Resource"),
+                    "url": url,
+                    "description": resource.get("description", f"Learn about {topic}")
+                }
+            else:
+                # 4xx (not found, forbidden, etc.) or 5xx (server error) - URL is broken
                 return None
+                
+    except httpx.HTTPStatusError as e:
+        # httpx raises this for 4xx/5xx if raise_for_status is called, but we check status directly
+        # If we get here, check the status code
+        if hasattr(e, 'response'):
+            status = e.response.status_code
+            if 200 <= status < 400:
+                return {
+                    "title": resource.get("title", f"{topic} Resource"),
+                    "url": url,
+                    "description": resource.get("description", f"Learn about {topic}")
+                }
+        # 4xx or 5xx - broken URL, don't include
+        return None
     except (httpx.TimeoutException, httpx.ConnectError, httpx.RequestError):
         # Network errors - URL might be valid but slow/unreachable
-        # For now, include it (better to show potentially working links than none)
-        return {
-            "title": resource.get("title", f"{topic} Resource"),
-            "url": url,
-            "description": resource.get("description", f"Learn about {topic}")
-        }
+        # Don't include if we can't verify (strict approach)
+        return None
     except Exception:
-        # Other errors - be lenient, include it
-        return {
-            "title": resource.get("title", f"{topic} Resource"),
-            "url": url,
-            "description": resource.get("description", f"Learn about {topic}")
-        }
+        # Other errors - can't verify, don't include
+        return None
 
 async def generate_plan_and_resources(topic: str, num_steps: int = None, num_examples: int = 5) -> tuple[List[Dict[str, str]], List[Dict[str, str]]]:
     """
