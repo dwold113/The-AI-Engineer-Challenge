@@ -196,20 +196,27 @@ JSON only:"""
             url = resource.get("url", "")
             title = resource.get("title", f"{topic} Resource")
             
-            # Validate URL format and verify it actually exists
+            # Validate URL format and verify it actually exists and is accessible
             if url and url.startswith("http"):
-                # Verify URL exists with actual HTTP request
+                # Verify URL exists with actual HTTP request - must succeed to include
                 url_exists = False
                 try:
-                    async with httpx.AsyncClient(timeout=3.0, follow_redirects=True) as http_client:
+                    async with httpx.AsyncClient(timeout=4.0, follow_redirects=True) as http_client:
                         # Try HEAD first (faster), fallback to GET if HEAD not supported
                         try:
                             response = await http_client.head(url, allow_redirects=True)
-                            url_exists = response.status_code < 400
-                        except httpx.HTTPStatusError:
+                            # Only include if URL returns success (2xx) or redirect (3xx)
+                            url_exists = 200 <= response.status_code < 400
+                        except httpx.HTTPStatusError as e:
                             # If HEAD fails, try GET
-                            response = await http_client.get(url, allow_redirects=True)
-                            url_exists = response.status_code < 400
+                            if hasattr(e, 'response') and 200 <= e.response.status_code < 400:
+                                url_exists = True
+                            else:
+                                try:
+                                    response = await http_client.get(url, allow_redirects=True)
+                                    url_exists = 200 <= response.status_code < 400
+                                except httpx.HTTPStatusError:
+                                    url_exists = False
                 except (httpx.TimeoutException, httpx.ConnectError, httpx.RequestError):
                     # Network errors (timeout, connection issues) - can't verify, don't include
                     url_exists = False
@@ -217,7 +224,7 @@ JSON only:"""
                     # Other errors - can't verify, don't include
                     url_exists = False
                 
-                # Include if URL is valid or if we couldn't verify (lenient approach)
+                # Only include if URL actually exists and is accessible
                 if url_exists:
                     examples.append({
                         "title": title,
