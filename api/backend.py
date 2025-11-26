@@ -320,21 +320,22 @@ Perform these tasks in one response:
 2. Extract any requested number of resources/examples (if mentioned)
 3. Extract any requested number of steps (if mentioned)
 4. Validate if the topic is learnable:
-   - CRITICAL: NOT gibberish, random characters, or nonsensical text
+   - NOT gibberish, random characters, or nonsensical text
      → Examples to REJECT: "fgnrjk gnsogfd", "asdfgh", "xyz abc", "qwerty", any random letter combinations
      → If the input has no meaning, is just random characters, or doesn't form real words, set is_valid to false
-   - Not abstract philosophical concepts
-   - Not too vague
-   - CRITICAL: NOT about a specific real person (politicians, celebrities, public figures, historical figures, etc.)
+   - NOT abstract philosophical concepts
+   - NOT too vague
+   - NOT about a specific real person (politicians, celebrities, public figures, historical figures, etc.)
      → Examples to REJECT: "donald trump", "barack obama", "barak obama", "elon musk", "taylor swift", "albert einstein", "steve jobs"
      → Learning plans should be for SKILLS, SUBJECTS, or CONCEPTS, not personal biographies or people
      → If the input is a person's name (even with typos), set is_valid to false
      → If about a person, suggest learning about their field/domain instead (e.g., "business strategy" instead of "donald trump", "public speaking" instead of "barack obama")
 5. If a resource number was requested, determine if it's reasonable (3-15 is reasonable)
 
-IMPORTANT RULES:
-- If the input is gibberish/random characters (like "fgnrjk gnsogfd"), you MUST reject it and set is_valid to false
-- If the input appears to be a person's name (first name + last name pattern, or a well-known single name), you MUST reject it and provide a helpful alternative suggestion
+All validation checks are equally important. Reject the topic if it fails any check:
+- If the input is gibberish/random characters (like "fgnrjk gnsogfd"), reject it and set is_valid to false
+- If the input appears to be a person's name (first name + last name pattern, or a well-known single name), reject it and provide a helpful alternative suggestion
+- If the input is too abstract, vague, or not learnable, reject it
 - Only approve topics that are real, meaningful, learnable subjects, skills, or concepts
 
 Respond in JSON format:
