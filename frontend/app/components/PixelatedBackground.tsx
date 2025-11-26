@@ -33,30 +33,17 @@ function BackgroundImage({ imageUrl, isGenerated = false }: BackgroundImageProps
     if (!imageUrl || !mounted) {
       setImageLoaded(false)
       setImageAspectRatio(null)
-      return
-    }
-
-    // For data URLs (uploaded images), they're already loaded
-    if (imageUrl.startsWith('data:')) {
       setIsLoading(false)
-      // Get image dimensions for uploaded images
-      const img = new Image()
-      img.onload = () => {
-        const aspectRatio = img.width / img.height
-        setImageAspectRatio(aspectRatio)
-        setImageLoaded(true)
-      }
-      img.src = imageUrl
       return
     }
 
-    // For remote URLs, check if image loads
+    // Always load the image to get dimensions and ensure it's ready
     setIsLoading(true)
     setImageLoaded(false)
     const img = new Image()
     
     img.onload = () => {
-      console.log('Image loaded successfully', img.width, img.height)
+      console.log('Image loaded successfully', img.width, img.height, 'isGenerated:', isGenerated)
       const aspectRatio = img.width / img.height
       setImageAspectRatio(aspectRatio)
       setIsLoading(false)
@@ -71,7 +58,7 @@ function BackgroundImage({ imageUrl, isGenerated = false }: BackgroundImageProps
     }
 
     img.src = imageUrl
-  }, [imageUrl, mounted])
+  }, [imageUrl, mounted, isGenerated])
 
   if (!mounted) {
     return null
@@ -96,8 +83,8 @@ function BackgroundImage({ imageUrl, isGenerated = false }: BackgroundImageProps
     )
   }
 
-  // Loading state (only for remote URLs)
-  if (isLoading && !imageUrl?.startsWith('data:')) {
+  // Loading state - show while image is loading
+  if (isLoading) {
     return (
       <div 
         style={{
@@ -119,29 +106,28 @@ function BackgroundImage({ imageUrl, isGenerated = false }: BackgroundImageProps
   }
 
   // Smart fit mode logic:
-  // - AI-generated images: ALWAYS use 'cover' to fill entire screen
+  // - AI-generated images: ALWAYS use 'cover' to fill entire screen (regardless of aspect ratio)
   // - Uploaded images/GIFs: Use smart judgment based on aspect ratio
   let useContain = false
   
-  if (imageAspectRatio !== null) {
-    if (isGenerated) {
-      // AI-generated images: ALWAYS cover the full screen
-      useContain = false
+  if (isGenerated) {
+    // AI-generated images: ALWAYS cover the full screen
+    // Don't wait for aspect ratio - just use cover immediately
+    useContain = false
+  } else if (imageAspectRatio !== null) {
+    // Uploaded images/GIFs: Use smart judgment
+    // Calculate aspect ratio difference
+    const aspectRatioDiff = Math.abs(imageAspectRatio - screenAspectRatio)
+    const ratioDifference = aspectRatioDiff / Math.max(imageAspectRatio, screenAspectRatio)
+    
+    // If aspect ratios are similar (within 30% difference), use cover to fill screen
+    // If very different (more than 30% difference), use contain to avoid cropping
+    if (ratioDifference > 0.3) {
+      // Aspect ratios are very different - use contain to show full image without cropping
+      useContain = true
     } else {
-      // Uploaded images/GIFs: Use smart judgment
-      // Calculate aspect ratio difference
-      const aspectRatioDiff = Math.abs(imageAspectRatio - screenAspectRatio)
-      const ratioDifference = aspectRatioDiff / Math.max(imageAspectRatio, screenAspectRatio)
-      
-      // If aspect ratios are similar (within 30% difference), use cover to fill screen
-      // If very different (more than 30% difference), use contain to avoid cropping
-      if (ratioDifference > 0.3) {
-        // Aspect ratios are very different - use contain to show full image without cropping
-        useContain = true
-      } else {
-        // Aspect ratios are similar - use cover to fill screen
-        useContain = false
-      }
+      // Aspect ratios are similar - use cover to fill screen
+      useContain = false
     }
   }
 
