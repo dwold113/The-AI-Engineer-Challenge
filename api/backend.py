@@ -212,101 +212,209 @@ Your response (JSON only, no markdown):"""
 async def scrape_examples(topic: str, num_examples: int = 3) -> List[Dict[str, str]]:
     """
     Scrape the web to find real examples related to the learning topic.
-    Uses DuckDuckGo search to find relevant articles, tutorials, or resources.
+    Uses multiple strategies to find relevant articles, tutorials, or resources.
     """
     examples = []
     
-    try:
-        # Use DuckDuckGo HTML search (no API key needed)
-        search_query = f"{topic} examples tutorial guide"
-        search_url = f"https://html.duckduckgo.com/html/?q={search_query.replace(' ', '+')}"
-        
-        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as http_client:
-            # Set headers to appear as a browser
-            headers = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-            }
+    # Try multiple search strategies
+    search_strategies = [
+        # Strategy 1: DuckDuckGo HTML search
+        {
+            "query": f"{topic} tutorial guide examples",
+            "url": f"https://html.duckduckgo.com/html/?q={topic.replace(' ', '+')}+tutorial+guide",
+            "selectors": [
+                ('a', {'class': 'result__a'}),
+                ('a', {'class': 'result-link'}),
+                ('a', {'class': 'web-result'}),
+                ('a', {'href': lambda x: x and x.startswith('/l/?')}),
+            ]
+        },
+        # Strategy 2: GitHub search
+        {
+            "query": f"{topic} site:github.com",
+            "url": f"https://html.duckduckgo.com/html/?q={topic.replace(' ', '+')}+site%3Agithub.com",
+            "selectors": [
+                ('a', {'class': 'result__a'}),
+                ('a', {'href': lambda x: x and 'github.com' in x}),
+            ]
+        },
+        # Strategy 3: General web search
+        {
+            "query": f"{topic} examples",
+            "url": f"https://html.duckduckgo.com/html/?q={topic.replace(' ', '+')}+examples",
+            "selectors": [
+                ('a', {'class': 'result__a'}),
+                ('a', {'class': 'result-link'}),
+            ]
+        }
+    ]
+    
+    for strategy in search_strategies:
+        if len(examples) >= num_examples:
+            break
             
-            response = await http_client.get(search_url, headers=headers)
-            response.raise_for_status()
-            
-            soup = BeautifulSoup(response.text, 'lxml')
-            
-            # Find search result links
-            results = soup.find_all('a', class_='result__a', limit=num_examples)
-            
-            for result in results:
-                title = result.get_text(strip=True)
-                url = result.get('href', '')
+        try:
+            async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as http_client:
+                headers = {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                    "Accept-Language": "en-US,en;q=0.5",
+                }
                 
-                # Clean up DuckDuckGo redirect URLs
-                if url.startswith('/l/?kh=') or 'uddg=' in url:
-                    # Extract actual URL from DuckDuckGo redirect
-                    try:
-                        if 'uddg=' in url:
-                            # Parse the redirect URL to get the actual destination
-                            parts = url.split('uddg=')
-                            if len(parts) > 1:
-                                encoded_url = parts[1].split('&')[0]
-                                actual_url = unquote(encoded_url)
+                response = await http_client.get(strategy["url"], headers=headers)
+                response.raise_for_status()
+                
+                soup = BeautifulSoup(response.text, 'lxml')
+                
+                # Try different selectors
+                results = []
+                for selector, attrs in strategy["selectors"]:
+                    found = soup.find_all(selector, attrs, limit=num_examples * 2)
+                    if found:
+                        results = found
+                        break
+                
+                # If no results with class selectors, try finding links in result containers
+                if not results:
+                    # Look for result containers and find links within them
+                    result_containers = soup.find_all(['div', 'article', 'section'], class_=lambda x: x and ('result' in str(x).lower() or 'web' in str(x).lower()))
+                    for container in result_containers[:num_examples * 2]:
+                        link = container.find('a', href=True)
+                        if link:
+                            results.append(link)
+                
+                for result in results:
+                    if len(examples) >= num_examples:
+                        break
+                    
+                    title = result.get_text(strip=True)
+                    url = result.get('href', '')
+                    
+                    if not title or not url:
+                        continue
+                    
+                    # Skip internal DuckDuckGo links
+                    if url.startswith('/') and not url.startswith('/l/?'):
+                        continue
+                    
+                    # Clean up DuckDuckGo redirect URLs
+                    if url.startswith('/l/?') or 'uddg=' in url:
+                        try:
+                            if 'uddg=' in url:
+                                parts = url.split('uddg=')
+                                if len(parts) > 1:
+                                    encoded_url = parts[1].split('&')[0]
+                                    actual_url = unquote(encoded_url)
+                                    # Validate it's a real URL
+                                    if actual_url.startswith('http'):
+                                        url = actual_url
+                                    else:
+                                        continue
+                                else:
+                                    continue
                             else:
-                                actual_url = url
-                        else:
-                            actual_url = url
-                    except Exception as e:
-                        print(f"Error parsing URL: {e}")
-                        actual_url = url
-                else:
-                    actual_url = url
-                
-                if title and actual_url:
+                                # Try to extract from query params
+                                from urllib.parse import parse_qs, urlparse
+                                parsed = urlparse(url)
+                                params = parse_qs(parsed.query)
+                                if 'uddg' in params:
+                                    url = unquote(params['uddg'][0])
+                                else:
+                                    continue
+                        except Exception as e:
+                            print(f"Error parsing redirect URL: {e}")
+                            continue
+                    
+                    # Validate URL
+                    if not url.startswith('http'):
+                        continue
+                    
+                    # Avoid duplicates
+                    if any(ex['url'] == url for ex in examples):
+                        continue
+                    
                     examples.append({
-                        "title": title,
-                        "url": actual_url,
+                        "title": title[:100],  # Limit title length
+                        "url": url,
                         "description": f"Learn more about {topic} with this resource"
                     })
-        
-        # If we didn't get enough examples, try a different approach
-        if len(examples) < num_examples:
-            # Use a simpler search approach
-            try:
-                # Try searching for GitHub examples, tutorials, etc.
-                github_query = f"{topic} examples site:github.com"
-                github_url = f"https://html.duckduckgo.com/html/?q={github_query.replace(' ', '+')}"
-                
-                async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as http_client:
-                    headers = {
-                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-                    }
-                    response = await http_client.get(github_url, headers=headers)
-                    soup = BeautifulSoup(response.text, 'lxml')
-                    results = soup.find_all('a', class_='result__a', limit=num_examples - len(examples))
                     
-                    for result in results:
-                        title = result.get_text(strip=True)
-                        url = result.get('href', '')
-                        if title and url and len(examples) < num_examples:
-                            examples.append({
-                                "title": title,
-                                "url": url,
-                                "description": f"Real-world example of {topic}"
-                            })
-            except Exception as e:
-                print(f"Error in secondary search: {e}")
-        
-    except Exception as e:
-        print(f"Error scraping examples: {e}")
-        # Return fallback examples
+        except Exception as e:
+            print(f"Error in search strategy: {e}")
+            continue
+    
+    # If we still don't have enough examples, generate some using AI
+    if len(examples) < num_examples:
+        try:
+            # Use GPT to suggest relevant resources
+            prompt = f"""Suggest {num_examples - len(examples)} specific, real online resources (websites, tutorials, courses, documentation) for learning about: {topic}
+
+For each resource, provide:
+- A specific website/tool name
+- A realistic URL (can be a search URL if specific URL unknown)
+- A brief description
+
+Format as JSON array:
+[
+  {{"title": "Resource Name", "url": "https://example.com", "description": "Brief description"}},
+  ...
+]
+
+Your response (JSON only, no markdown):"""
+
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are an expert at finding learning resources. Suggest real, specific websites, tutorials, courses, or documentation that exist online."
+                    },
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=500,
+                temperature=0.7
+            )
+            
+            result = response.choices[0].message.content.strip()
+            if result.startswith("```json"):
+                result = result[7:]
+            if result.startswith("```"):
+                result = result[3:]
+            if result.endswith("```"):
+                result = result[:-3]
+            result = result.strip()
+            
+            ai_resources = json.loads(result)
+            for resource in ai_resources:
+                if len(examples) >= num_examples:
+                    break
+                # Avoid duplicates
+                if not any(ex['url'] == resource.get('url', '') for ex in examples):
+                    examples.append({
+                        "title": resource.get("title", f"{topic} Resource"),
+                        "url": resource.get("url", f"https://www.google.com/search?q={topic.replace(' ', '+')}"),
+                        "description": resource.get("description", f"Learn about {topic}")
+                    })
+        except Exception as e:
+            print(f"Error generating AI resources: {e}")
+    
+    # Final fallback if we still don't have enough
+    if len(examples) == 0:
         examples = [
+            {
+                "title": f"{topic} - Search Results",
+                "url": f"https://www.google.com/search?q={topic.replace(' ', '+')}+tutorial",
+                "description": f"Find tutorials and resources about {topic}"
+            },
             {
                 "title": f"{topic} - Wikipedia",
                 "url": f"https://en.wikipedia.org/wiki/{topic.replace(' ', '_')}",
                 "description": f"Learn the basics of {topic} on Wikipedia"
             },
             {
-                "title": f"{topic} Tutorial",
-                "url": f"https://www.google.com/search?q={topic.replace(' ', '+')}+tutorial",
-                "description": f"Find tutorials about {topic}"
+                "title": f"{topic} - YouTube Tutorials",
+                "url": f"https://www.youtube.com/results?search_query={topic.replace(' ', '+')}+tutorial",
+                "description": f"Watch video tutorials about {topic}"
             }
         ]
     
