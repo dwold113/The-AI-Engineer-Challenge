@@ -337,10 +337,6 @@ async def create_learning_experience(request: LearningRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error creating learning experience: {str(e)}")
 
-# Keep old endpoints for backward compatibility (can remove later)
-class ChatRequest(BaseModel):
-    message: str
-
 async def expand_learning_step(topic: str, step_title: str, step_description: str) -> Dict[str, any]:
     """
     Generate additional clarity and context for a learning step without repeating existing information.
@@ -441,21 +437,3 @@ async def expand_step(request: ExpandStepRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error expanding learning step: {str(e)}")
 
-@app.post("/api/chat")
-def chat(request: ChatRequest):
-    """Legacy chat endpoint - kept for compatibility"""
-    if not os.getenv("OPENAI_API_KEY"):
-        raise HTTPException(status_code=500, detail="OPENAI_API_KEY not configured")
-    
-    try:
-        user_message = request.message
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "You are a helpful learning assistant"},
-                {"role": "user", "content": user_message}
-            ]
-        )
-        return {"reply": response.choices[0].message.content}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error calling OpenAI API: {str(e)}")
