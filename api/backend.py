@@ -319,12 +319,16 @@ Perform these tasks in one response:
 1. Extract the clean learning topic (remove number requests)
 2. Extract any requested number of resources/examples (if mentioned)
 3. Extract any requested number of steps (if mentioned)
-4. Validate if the topic is learnable:
+4. Validate if the topic is learnable. REJECT if it fails ANY of these checks:
    - NOT gibberish, random characters, or nonsensical text
      → Examples to REJECT: "fgnrjk gnsogfd", "asdfgh", "xyz abc", "qwerty", any random letter combinations
      → If the input has no meaning, is just random characters, or doesn't form real words, set is_valid to false
-   - NOT abstract philosophical concepts
-   - NOT too vague
+   - NOT random words put together that make no sense or have no coherent meaning
+     → Examples to REJECT: "time space coffee", "car tree music", "water fire sky", "book phone table"
+     → If words are unrelated and don't form a coherent learning topic, set is_valid to false
+     → The topic must be a REAL, MEANINGFUL subject that can actually be learned
+   - NOT abstract philosophical concepts that can't be practically learned
+   - NOT too vague (must be specific enough to create a learning plan)
    - NOT about a specific real person (politicians, celebrities, public figures, historical figures, etc.)
      → Examples to REJECT: "donald trump", "barack obama", "barak obama", "elon musk", "taylor swift", "albert einstein", "steve jobs"
      → Learning plans should be for SKILLS, SUBJECTS, or CONCEPTS, not personal biographies or people
@@ -332,11 +336,13 @@ Perform these tasks in one response:
      → If about a person, suggest learning about their field/domain instead (e.g., "business strategy" instead of "donald trump", "public speaking" instead of "barack obama")
 5. If a resource number was requested, determine if it's reasonable (3-15 is reasonable)
 
-All validation checks are equally important. Reject the topic if it fails any check:
+All validation checks are equally important. Reject the topic if it fails ANY check:
 - If the input is gibberish/random characters (like "fgnrjk gnsogfd"), reject it and set is_valid to false
+- If the input is random words put together with no coherent meaning (like "time space coffee", "car tree music"), reject it and set is_valid to false
 - If the input appears to be a person's name (first name + last name pattern, or a well-known single name), reject it and provide a helpful alternative suggestion
 - If the input is too abstract, vague, or not learnable, reject it
-- Only approve topics that are real, meaningful, learnable subjects, skills, or concepts
+- Only approve topics that are REAL, MEANINGFUL, COHERENT, learnable subjects, skills, or concepts
+- The topic must make logical sense as something someone can actually learn about
 
 Respond in JSON format:
 {{
@@ -352,7 +358,7 @@ JSON only:"""
 
         result = call_ai(
             combined_prompt,
-            "Expert at extracting and validating learning topics. You MUST reject: (1) Gibberish/random characters/nonsensical text - if input has no meaning or is just random letters, reject it. (2) Specific real person names - learning plans are for skills, subjects, and concepts only, never for people. Be very strict about detecting gibberish and person names. Only approve real, meaningful, learnable topics.",
+            "Expert at extracting and validating learning topics. You MUST REJECT: (1) Gibberish/random characters - if input has no meaning or is just random letters, reject it. (2) Random word combinations with no coherent meaning - if words are unrelated and don't form a real learning topic (like 'time space coffee'), reject it. (3) Specific real person names - learning plans are for skills, subjects, and concepts only, never for people. (4) Abstract, vague, or unlearnable topics. Be EXTREMELY STRICT. Only approve topics that are REAL, MEANINGFUL, COHERENT, and actually learnable. When in doubt, REJECT the topic.",
             max_tokens=200,
             temperature=0.1
         )
