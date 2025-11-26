@@ -319,7 +319,13 @@ Perform these tasks in one response:
 1. Extract the clean learning topic (remove number requests)
 2. Extract any requested number of resources/examples (if mentioned)
 3. Extract any requested number of steps (if mentioned)
-4. Validate if the topic is learnable (not gibberish, abstract, or too vague)
+4. Validate if the topic is learnable:
+   - Not gibberish or random characters
+   - Not abstract philosophical concepts
+   - Not too vague
+   - NOT about a specific real person (e.g., "donald trump", "elon musk", "taylor swift")
+     → Learning plans should be for skills, subjects, or concepts, not personal biographies
+     → If about a person, suggest learning about their field/domain instead (e.g., "business strategy" instead of "donald trump")
 5. If a resource number was requested, determine if it's reasonable (3-15 is reasonable)
 
 Respond in JSON format:
@@ -328,7 +334,7 @@ Respond in JSON format:
   "num_resources": number or null,
   "num_steps": number or null,
   "is_valid": true/false,
-  "validation_message": "error message if invalid, empty if valid",
+  "validation_message": "error message if invalid, empty if valid. If about a person, suggest learning the skill/domain instead.",
   "resource_message": "message if resource count was adjusted, empty otherwise"
 }}
 
@@ -336,7 +342,7 @@ JSON only:"""
 
         result = call_ai(
             combined_prompt,
-            "Expert at extracting and validating learning topics. Extract topic and numbers, validate topic quality, and validate number reasonableness. Use common sense.",
+            "Expert at extracting and validating learning topics. Extract topic and numbers, validate topic quality, and validate number reasonableness. Reject topics about specific real people - suggest learning skills or domains instead. Use common sense.",
             max_tokens=200,
             temperature=0.1
         )
