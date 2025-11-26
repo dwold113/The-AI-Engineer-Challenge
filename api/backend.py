@@ -358,11 +358,17 @@ JSON only:"""
         )
         data = parse_json_response(result)
         
-        # Extract values
-        clean_topic = data.get("topic", topic).strip()
-        if not clean_topic:
+        # Extract values - handle None safely
+        extracted_topic = data.get("topic")
+        if extracted_topic:
+            clean_topic = str(extracted_topic).strip()
+        else:
+            # Fallback to original topic if extraction failed
             clean_topic = re.sub(r'[.,;:]+$', '', topic).strip()
             clean_topic = re.sub(r'\s+', ' ', clean_topic)
+        
+        if not clean_topic:
+            clean_topic = topic.strip()
         
         # Handle resource count
         if data.get("num_resources"):
@@ -392,11 +398,12 @@ JSON only:"""
         
     except Exception as e:
         print(f"Error in combined extraction/validation: {e}")
-        # Fallback: basic cleanup and assume valid
+        # If validation fails, be strict and reject the topic
+        # Better to reject potentially invalid topics than to allow gibberish/person names
         clean_topic = re.sub(r'[.,;:]+$', '', topic).strip()
         clean_topic = re.sub(r'\s+', ' ', clean_topic)
-        is_valid = True
-        validation_message = ""
+        is_valid = False
+        validation_message = "Unable to validate this topic. Please enter a clear, learnable subject, skill, or concept."
     
     return clean_topic, num_resources, message.strip(), num_steps, is_valid, validation_message
 
