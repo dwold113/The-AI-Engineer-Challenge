@@ -18,6 +18,7 @@ interface Example {
 interface LearningResponse {
   plan: LearningStep[]
   examples: Example[]
+  message?: string
 }
 
 interface ExpandedStep {
@@ -374,6 +375,14 @@ export default function Home() {
                   Real Examples & Resources
                 </h2>
               </div>
+              {learningData.message && (
+                <div className="mb-6 bg-blue-500/20 backdrop-blur-sm border-2 border-blue-500/50 text-blue-100 px-5 py-4 rounded-xl animate-fade-in shadow-lg">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">ℹ️</span>
+                    <span className="font-medium">{learningData.message}</span>
+                  </div>
+                </div>
+              )}
               <div className="grid gap-5 md:grid-cols-2">
                 {learningData.examples.map((example, index) => (
                   <a

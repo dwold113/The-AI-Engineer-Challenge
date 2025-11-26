@@ -32,6 +32,7 @@ class LearningRequest(BaseModel):
 class LearningPlanResponse(BaseModel):
     plan: List[Dict[str, str]]
     examples: List[Dict[str, str]]
+    message: str = ""  # Optional message about resource count adjustments
 
 class ExpandStepRequest(BaseModel):
     topic: str
@@ -303,16 +304,19 @@ async def scrape_examples(topic: str, num_examples: int = 3) -> List[Dict[str, s
     
     return examples[:num_examples]
 
-def extract_topic_and_num_resources(topic: str) -> tuple[str, int]:
+def extract_topic_and_num_resources(topic: str) -> tuple[str, int, str]:
     """
     Extract the clean topic and requested number of resources from user input.
+    Uses AI to determine if the requested number is reasonable.
     Handles patterns like "topic. Can you give me 10 resources" or "topic (5 examples)"
-    Returns (clean_topic, num_resources)
+    Returns (clean_topic, num_resources, message)
     """
     import re
     
     # Default number of resources
     num_resources = 5
+    message = ""
+    requested_num = None
     
     # Look for patterns like "10 resources", "5 examples", "give me 8", etc.
     patterns = [
@@ -320,23 +324,22 @@ def extract_topic_and_num_resources(topic: str) -> tuple[str, int]:
         r'give\s+me\s+(\d+)',
         r'(\d+)\s+to\s+start',
         r'(\d+)\s+i\s+can',
+        r'(\d+)\s+to\s+begin',
     ]
     
     for pattern in patterns:
         match = re.search(pattern, topic.lower())
         if match:
             try:
-                num = int(match.group(1))
-                # Reasonable limits: 3-20 resources
-                if 3 <= num <= 20:
-                    num_resources = num
-                    # Remove the resource request part from the topic
-                    topic = re.sub(pattern, '', topic, flags=re.IGNORECASE).strip()
-                    # Clean up common phrases
-                    topic = re.sub(r'\s*can\s+you\s+give\s+me\s*', '', topic, flags=re.IGNORECASE).strip()
-                    topic = re.sub(r'\s*i\s+can\s+start\s+with\s*', '', topic, flags=re.IGNORECASE).strip()
-                    topic = re.sub(r'\s*to\s+start\s*$', '', topic, flags=re.IGNORECASE).strip()
-                    break
+                requested_num = int(match.group(1))
+                # Remove the resource request part from the topic
+                topic = re.sub(pattern, '', topic, flags=re.IGNORECASE).strip()
+                # Clean up common phrases
+                topic = re.sub(r'\s*can\s+you\s+give\s+me\s*', '', topic, flags=re.IGNORECASE).strip()
+                topic = re.sub(r'\s*i\s+can\s+start\s+with\s*', '', topic, flags=re.IGNORECASE).strip()
+                topic = re.sub(r'\s*to\s+start\s*$', '', topic, flags=re.IGNORECASE).strip()
+                topic = re.sub(r'\s*to\s+begin\s*$', '', topic, flags=re.IGNORECASE).strip()
+                break
             except ValueError:
                 continue
     
@@ -344,7 +347,71 @@ def extract_topic_and_num_resources(topic: str) -> tuple[str, int]:
     topic = re.sub(r'[.,;:]+$', '', topic).strip()
     topic = re.sub(r'\s+', ' ', topic)
     
-    return topic, num_resources
+    # Use AI to determine if the requested number is reasonable
+    if requested_num is not None:
+        try:
+            validation_prompt = f"""A user requested {requested_num} resources/examples for learning about a topic.
+
+Is this a reasonable number? Consider:
+- Too few (1-2): Not enough variety
+- Reasonable (3-15): Good for learning, manageable to review
+- Many (16-30): Still reasonable but might be overwhelming
+- Too many (31+): Likely too overwhelming, hard to process, may not be useful
+
+Respond with ONLY:
+- "REASONABLE: {requested_num}" if it's reasonable
+- "TOO_MANY: [suggested_number]" if it's too many (suggest a reasonable alternative like 15 or 20)
+- "TOO_FEW: [suggested_number]" if it's too few (suggest at least 3)
+
+Your response:"""
+
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are an expert at determining reasonable resource counts for learning. Use common sense - too many resources can be overwhelming and counterproductive."
+                    },
+                    {"role": "user", "content": validation_prompt}
+                ],
+                max_tokens=50,
+                temperature=0.1
+            )
+            
+            result = response.choices[0].message.content.strip().upper()
+            
+            if result.startswith("REASONABLE"):
+                num_resources = requested_num
+            elif result.startswith("TOO_MANY"):
+                # Extract suggested number
+                suggested_match = re.search(r'(\d+)', result)
+                if suggested_match:
+                    num_resources = int(suggested_match.group(1))
+                    message = f"You requested {requested_num} resources, but that might be overwhelming. I'll provide {num_resources} high-quality resources instead."
+                else:
+                    num_resources = 20  # Default cap
+                    message = f"You requested {requested_num} resources, but that's too many to be useful. I'll provide {num_resources} high-quality resources instead."
+            elif result.startswith("TOO_FEW"):
+                suggested_match = re.search(r'(\d+)', result)
+                if suggested_match:
+                    num_resources = int(suggested_match.group(1))
+                    message = f"You requested {requested_num} resources, but that's not enough. I'll provide {num_resources} resources instead."
+                else:
+                    num_resources = 5
+            else:
+                # Fallback: use requested number but cap at 30
+                num_resources = min(requested_num, 30)
+                if requested_num > 30:
+                    message = f"You requested {requested_num} resources. I'll provide {num_resources} high-quality resources to keep it manageable."
+        except Exception as e:
+            print(f"Error validating resource count: {e}")
+            # Fallback: use requested number but cap at 30
+            if requested_num:
+                num_resources = min(requested_num, 30)
+                if requested_num > 30:
+                    message = f"You requested {requested_num} resources. I'll provide {num_resources} high-quality resources to keep it manageable."
+    
+    return topic, num_resources, message
 
 @app.post("/api/learn", response_model=LearningPlanResponse)
 async def create_learning_experience(request: LearningRequest):
@@ -359,7 +426,7 @@ async def create_learning_experience(request: LearningRequest):
     original_topic = request.topic.strip()
     
     # Extract clean topic and requested number of resources
-    clean_topic, num_resources = extract_topic_and_num_resources(original_topic)
+    clean_topic, num_resources, resource_message = extract_topic_and_num_resources(original_topic)
     
     # Use clean topic for validation and plan generation
     is_valid, validation_message = validate_learning_topic(clean_topic)
@@ -379,7 +446,8 @@ async def create_learning_experience(request: LearningRequest):
         
         return LearningPlanResponse(
             plan=plan,
-            examples=examples
+            examples=examples,
+            message=resource_message
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error creating learning experience: {str(e)}")
