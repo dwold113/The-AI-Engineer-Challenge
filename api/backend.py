@@ -144,15 +144,23 @@ def root():
         "app": "Learning Experience App"
     }
 
-async def generate_learning_plan(topic: str) -> List[Dict[str, str]]:
+async def generate_learning_plan(topic: str, num_steps: int = None) -> List[Dict[str, str]]:
     """
     Use GPT to generate a structured learning plan for the given topic.
     Returns a list of steps with titles and descriptions.
     """
     try:
+        # Determine number of steps
+        if num_steps is None:
+            step_count = "5-7"
+            step_instruction = "Provide a practical, actionable plan with 5-7 steps."
+        else:
+            step_count = str(num_steps)
+            step_instruction = f"Provide exactly {num_steps} steps. Make sure the plan is comprehensive but fits within {num_steps} steps."
+        
         prompt = f"""Create a step-by-step learning plan for someone who wants to learn about: {topic}
 
-Provide a practical, actionable plan with 5-7 steps. For each step, include:
+{step_instruction} For each step, include:
 - A clear title
 - A detailed description of what to do
 - Why this step is important
