@@ -6,7 +6,7 @@ import os
 import httpx
 import asyncio
 import re
-from urllib.parse import unquote
+from urllib.parse import unquote, parse_qs, urlparse
 from dotenv import load_dotenv
 from bs4 import BeautifulSoup
 from typing import List, Dict
@@ -314,7 +314,6 @@ async def scrape_examples(topic: str, num_examples: int = 3) -> List[Dict[str, s
                                     continue
                             else:
                                 # Try to extract from query params
-                                from urllib.parse import parse_qs, urlparse
                                 parsed = urlparse(url)
                                 params = parse_qs(parsed.query)
                                 if 'uddg' in params:
