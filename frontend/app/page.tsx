@@ -100,6 +100,49 @@ export default function Home() {
     }
   }
 
+  const handleExpandStep = async (index: number, step: LearningStep) => {
+    // If already expanded, collapse it
+    if (expandedSteps[index]) {
+      const newExpanded = { ...expandedSteps }
+      delete newExpanded[index]
+      setExpandedSteps(newExpanded)
+      return
+    }
+
+    // If already expanding, don't do anything
+    if (expandingStep === index) {
+      return
+    }
+
+    setExpandingStep(index)
+
+    try {
+      const response = await fetch(`${API_URL}/api/expand-step`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          topic: topic.trim(),
+          step_title: step.title,
+          step_description: step.description,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to expand step')
+      }
+
+      const expanded: ExpandedStep = await response.json()
+      setExpandedSteps({ ...expandedSteps, [index]: expanded })
+    } catch (err) {
+      console.error('Error expanding step:', err)
+      setError('Failed to load detailed information. Please try again.')
+    } finally {
+      setExpandingStep(null)
+    }
+  }
+
   if (!mounted) {
     return null
   }
