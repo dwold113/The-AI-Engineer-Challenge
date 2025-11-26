@@ -242,7 +242,11 @@ export default function Home() {
             AI Background Generator
           </h1>
           
-          <div className="bg-black/20 backdrop-blur-md rounded-xl p-8 shadow-2xl border border-white/20 animate-fade-in">
+          <div className={`rounded-xl p-8 shadow-2xl border border-white/20 animate-fade-in transition-all ${
+            imageUrl && !isInputFocused && !prompt.trim()
+              ? 'bg-black/5 backdrop-blur-sm' // Very transparent when image is present, not focused, and empty
+              : 'bg-black/10 backdrop-blur-sm' // Slightly more opaque when typing or no image
+          }`}>
             <div className="flex flex-col gap-5">
               {/* Mode Toggle */}
               <div className="flex gap-2 mb-2">
