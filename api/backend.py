@@ -398,9 +398,17 @@ JSON only:"""
         if data.get("num_steps"):
             num_steps = int(data["num_steps"])
         
-        # Handle validation
-        is_valid = data.get("is_valid", True)
+        # Handle validation - default to False if not explicitly set to True
+        # Be strict: only allow if AI explicitly says it's valid
+        is_valid = data.get("is_valid", False)  # Changed default from True to False
         validation_message = data.get("validation_message", "").strip()
+        
+        # If validation message exists but is_valid is True, that's suspicious - be more strict
+        if validation_message and is_valid:
+            # If there's a validation message, it usually means there's an issue
+            # Only allow if message is empty or clearly indicates it's valid
+            if validation_message.lower() not in ["", "valid", "ok"]:
+                is_valid = False
         
     except Exception as e:
         print(f"Error in combined extraction/validation: {e}")
