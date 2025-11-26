@@ -343,48 +343,53 @@ def extract_topic_and_num_resources(topic: str) -> tuple[str, int, str, int]:
     requested_num = None
     requested_steps = None
     
-    # Look for patterns like "10 resources", "5 examples", "give me 8", "3 steps", etc.
-    resource_patterns = [
-        r'(\d+)\s*(?:resources?|examples?|links?|sources?)',
-        r'give\s+me\s+(\d+)\s*(?:resources?|examples?)',
-        r'(\d+)\s+to\s+start',
-        r'(\d+)\s+i\s+can',
-        r'(\d+)\s+to\s+begin',
-    ]
-    
-    step_patterns = [
-        r'(\d+)\s*steps?',
-        r'give\s+me\s+(\d+)\s*steps?',
-        r'(\d+)\s*step\s+plan',
-    ]
-    
-    # First, look for step requests
-    for pattern in step_patterns:
-        match = re.search(pattern, topic.lower())
-        if match:
-            try:
-                requested_steps = int(match.group(1))
-                # Remove the step request part from the topic
-                topic = re.sub(pattern, '', topic, flags=re.IGNORECASE).strip()
-                break
-            except ValueError:
-                continue
-    
-    # Then look for resource requests
-    for pattern in resource_patterns:
-        match = re.search(pattern, topic.lower())
-        if match:
-            try:
-                requested_num = int(match.group(1))
-                # Remove the resource request part from the topic
-                topic = re.sub(pattern, '', topic, flags=re.IGNORECASE).strip()
-                break
-            except ValueError:
-                continue
-    
-    # Clean up the topic: remove trailing punctuation, extra spaces
-    topic = re.sub(r'[.,;:]+$', '', topic).strip()
-    topic = re.sub(r'\s+', ' ', topic)
+    # Use AI to extract numbers and clean topic
+    try:
+        extraction_prompt = f"""Extract from this user input: "{topic}"
+
+Find:
+1. The learning topic (remove any number requests)
+2. Any requested number of resources/examples (if mentioned)
+3. Any requested number of steps (if mentioned)
+
+Respond in JSON format:
+{{"topic": "clean topic", "num_resources": number or null, "num_steps": number or null}}
+
+JSON only:"""
+
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "Extract learning topic and requested numbers from user input. Return clean topic and numbers."
+                },
+                {"role": "user", "content": extraction_prompt}
+            ],
+            max_tokens=100,
+            temperature=0.1
+        )
+        
+        result = response.choices[0].message.content.strip()
+        if result.startswith("```json"):
+            result = result[7:]
+        if result.startswith("```"):
+            result = result[3:]
+        if result.endswith("```"):
+            result = result[:-3]
+        result = result.strip()
+        
+        extracted = json.loads(result)
+        topic = extracted.get("topic", topic).strip()
+        if extracted.get("num_resources"):
+            requested_num = int(extracted["num_resources"])
+        if extracted.get("num_steps"):
+            requested_steps = int(extracted["num_steps"])
+    except Exception as e:
+        print(f"Error extracting topic/numbers: {e}")
+        # Fallback: basic cleanup
+        topic = re.sub(r'[.,;:]+$', '', topic).strip()
+        topic = re.sub(r'\s+', ' ', topic)
     
     # Use AI to determine if the requested number is reasonable
     if requested_num is not None:
