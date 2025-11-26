@@ -85,21 +85,28 @@ Step 1: Does this describe something that can be visualized as an image?
 - Does it describe visual elements (objects, scenes, colors, shapes, landscapes, etc.)?
 - Or is it abstract/philosophical (concepts, ideas, emotions without visual representation)?
 
-Step 2: Examples of what CAN be visualized:
+Step 2: IMPORTANT - Check if prompt requests a specific real person:
+- Does the prompt contain a specific person's name (like "jaxson dart", "elon musk", "taylor swift")?
+- If yes, this is a problem because AI image generators cannot accurately create images of specific real people
+- Instead, suggest describing the scene without the person's name (e.g., "a quarterback running" instead of "jaxson dart running")
+
+Step 3: Examples of what CAN be visualized:
 - "a sunset over mountains" ✅ (clear visual scene)
 - "abstract geometric patterns" ✅ (visual design)
 - "a cyberpunk city at night" ✅ (describes a scene)
 - "serene forest with glowing mushrooms" ✅ (visual elements)
+- "a quarterback running on a field" ✅ (describes a scene without specific person)
 
-Step 3: Examples of what CANNOT be visualized:
+Step 4: Examples of what CANNOT be visualized:
 - "Open weights. Infinite possibilities" ❌ (abstract concept, no visual elements)
 - "the meaning of life" ❌ (philosophical, not visual)
 - "freedom to run anywhere" ❌ (abstract concept, not a scene)
+- "jaxson dart running" ❌ (requests specific real person - AI cannot accurately generate this)
 
-Step 4: Your analysis:
+Step 5: Your analysis:
 Respond with ONLY one of these:
-- "VALID" if it can be visualized as an image
-- "INVALID: [brief explanation]" if it cannot be visualized, with a helpful suggestion
+- "VALID" if it can be visualized as an image AND doesn't request a specific real person
+- "INVALID: [brief explanation]" if it cannot be visualized or requests a specific real person, with a helpful suggestion
 
 Your response:"""
 
