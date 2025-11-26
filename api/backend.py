@@ -57,7 +57,7 @@ def validate_learning_topic(topic: str) -> tuple[bool, str]:
         return (False, "Please provide a meaningful topic, not just repeated characters.")
     
     # Check for only special characters or numbers
-    only_special_chars = /^[^a-zA-Z\s]{2,}$/
+    only_special_chars = re.compile(r'^[^a-zA-Z\s]{2,}$')
     if only_special_chars.match(topic_lower):
         return (False, "Please use words to describe what you want to learn, not just symbols or numbers.")
     
