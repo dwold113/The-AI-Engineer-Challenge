@@ -74,52 +74,34 @@ def validate_prompt_makes_sense(prompt: str) -> tuple[bool, str]:
     if len(set(prompt_lower.replace(' ', ''))) < 3:
         return (False, "Please provide a meaningful description, not just repeated characters.")
     
-    # Check if user is requesting a GIF/animated image
-    # DALL-E 3 only generates static images, not animated GIFs
-    gif_keywords = ['gif', 'animated', 'animation', 'moving', 'video']
-    if any(keyword in prompt_lower for keyword in gif_keywords):
-        return (False, "DALL-E can only generate static images, not animated GIFs. Try describing the scene instead, like 'a boy dancing' or 'a dancing boy in motion'. You can upload your own GIF files using the 'Upload Image' option.")
-    
-    # Check if user is requesting copyrighted/trademarked content
-    # DALL-E cannot accurately generate specific copyrighted characters, franchises, or brands
-    copyrighted_keywords = ['marvel', 'disney', 'star wars', 'starwars', 'superman', 'batman', 'spiderman', 'spider-man', 'iron man', 'captain america', 'avengers', 'x-men', 'wolverine', 'pokemon', 'pikachu', 'mario', 'sonic', 'mickey mouse', 'mickey', 'donald duck', 'goofy', 'nintendo', 'disney character']
-    if any(keyword in prompt_lower for keyword in copyrighted_keywords):
-        return (False, "DALL-E cannot generate accurate images of copyrighted characters or franchises (like Marvel, Disney, Star Wars, etc.). Try describing a similar scene instead, like 'superheroes in space' or 'cosmic warriors' or 'space heroes'.")
-    
-    # Quick heuristic check for obviously valid prompts (skip AI validation for speed)
-    # If prompt contains visual keywords, it's likely valid - skip expensive AI call
-    visual_keywords = ['at', 'with', 'of', 'in', 'on', 'over', 'under', 'through', 'across', 'sunset', 'sunrise', 'night', 'day', 'city', 'mountain', 'ocean', 'forest', 'beach', 'sky', 'cloud', 'star', 'light', 'dark', 'color', 'abstract', 'pattern', 'scene', 'landscape', 'portrait', 'view']
-    has_visual_keywords = any(keyword in prompt_lower for keyword in visual_keywords)
-    
-    # Only use AI validation for potentially problematic prompts
-    # Skip AI validation for obviously visual prompts to save time
-    if has_visual_keywords and len(words) >= 2:
-        # Quick check for specific person names (common names that might be in prompts)
-        # This is a fast heuristic - if it passes, skip expensive AI validation
-        common_names = ['elon', 'musk', 'taylor', 'swift', 'obama', 'trump', 'biden', 'gates', 'bezos', 'zuckerberg']
-        has_name = any(name in prompt_lower for name in common_names)
-        if not has_name:
-            # Looks like a valid visual prompt - skip AI validation for speed
-            return (True, "")
-    
-    # Use fast AI validation only for edge cases
+    # Use AI to validate the prompt - it will intelligently catch all edge cases
+    # No hardcoded keyword lists - AI handles copyrighted content, GIF requests, specific people, etc.
     try:
-        validation_prompt = f"""Is this a valid image prompt? "{prompt}"
+        validation_prompt = f"""Analyze this image generation prompt: "{prompt}"
+
+Check for these issues:
+1. Abstract/philosophical concepts (e.g., "freedom", "the meaning of life")
+2. Specific real people (e.g., "jaxson dart", "elon musk", "taylor swift")
+3. Copyrighted/trademarked content (e.g., "marvel", "disney", "star wars", specific superhero names)
+4. Animated/GIF requests (e.g., "gif of", "animated", "moving video")
 
 Respond ONLY:
-- "VALID" if it describes a visual scene/object (not abstract concepts or specific real people)
-- "INVALID: [reason]" if it's abstract, philosophical, or requests a specific real person
+- "VALID" if it's a visual scene/object without the above issues
+- "INVALID: [specific reason and helpful suggestion]" if it has any of the above issues
 
 Response:"""
 
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "Validate image prompts. Only approve visual scenes/objects. Reject abstract concepts or specific real people."},
+                {
+                    "role": "system", 
+                    "content": "You are an expert at validating image generation prompts. Check for abstract concepts, specific real people, copyrighted content, and animation requests. Provide helpful suggestions when rejecting prompts."
+                },
                 {"role": "user", "content": validation_prompt}
             ],
-            max_tokens=30,  # Minimal tokens for fastest response
-            temperature=0.1  # Very low temperature for speed
+            max_tokens=50,  # Enough for reason + suggestion
+            temperature=0.1  # Low temperature for consistent validation
         )
         
         result = response.choices[0].message.content.strip().upper()
