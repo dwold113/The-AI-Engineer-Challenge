@@ -59,43 +59,71 @@ def chat(request: ChatRequest):
 
 def validate_prompt_makes_sense(prompt: str) -> tuple[bool, str]:
     """
-    Fast validation to check if a prompt makes sense for image generation.
-    Uses quick heuristics first, only uses AI for edge cases.
+    Validate if a prompt makes sense for image generation by checking if it describes visual elements.
     Returns (is_valid, message)
     """
     prompt_lower = prompt.lower().strip()
-    
-    # Quick checks for obvious invalid prompts (no API call needed)
-    test_words = ['test', 'dummy', 'placeholder', 'example', 'sample', 'asdf', 'qwerty']
     words = prompt_lower.split()
     
-    # Check if prompt is just a test word
+    # Quick checks for obvious invalid prompts
+    test_words = ['test', 'dummy', 'placeholder', 'example', 'sample', 'asdf', 'qwerty']
     if len(words) <= 2 and any(word in test_words for word in words):
         return (False, "This doesn't describe a visual scene. Please describe what you want to see, like 'a sunset over mountains' or 'a cozy coffee shop'.")
-    
-    # Check if prompt is too short and vague
-    if len(words) < 2:
-        return (False, "Please provide more details about the background you want to see.")
     
     # Check for repeated characters or nonsense
     if len(set(prompt_lower.replace(' ', ''))) < 3:
         return (False, "Please provide a meaningful description of a visual scene, not just repeated characters.")
     
-    # If it passes quick checks and has descriptive words, allow it
-    # Skip AI validation for speed - frontend already does basic validation
-    descriptive_indicators = ['landscape', 'scene', 'background', 'view', 'image', 'picture', 'photo', 
-                            'sunset', 'sunrise', 'city', 'forest', 'beach', 'mountain', 'ocean', 
-                            'room', 'interior', 'exterior', 'night', 'day', 'color', 'style']
+    # Check if prompt contains visual/descriptive words that indicate it can be turned into an image
+    visual_keywords = [
+        # Objects and things
+        'image', 'picture', 'photo', 'scene', 'view', 'landscape', 'portrait', 'art', 'artwork', 'design',
+        # Places and locations
+        'city', 'forest', 'beach', 'mountain', 'ocean', 'desert', 'valley', 'island', 'room', 'house', 'building',
+        # Nature
+        'sunset', 'sunrise', 'sky', 'cloud', 'tree', 'flower', 'water', 'river', 'lake', 'sea',
+        # Time and atmosphere
+        'night', 'day', 'morning', 'evening', 'foggy', 'sunny', 'rainy', 'snowy',
+        # Colors and styles
+        'color', 'colour', 'bright', 'dark', 'vibrant', 'abstract', 'geometric', 'pattern',
+        # Actions and concepts that can be visualized
+        'flying', 'floating', 'glowing', 'shining', 'reflection', 'shadow', 'light', 'space',
+        # Descriptive adjectives
+        'serene', 'peaceful', 'dramatic', 'majestic', 'beautiful', 'stunning', 'epic', 'vast',
+        # Visual concepts
+        'horizon', 'perspective', 'depth', 'texture', 'gradient', 'silhouette'
+    ]
     
-    if any(indicator in prompt_lower for indicator in descriptive_indicators):
+    # Check if prompt contains visual keywords
+    has_visual_keywords = any(keyword in prompt_lower for keyword in visual_keywords)
+    
+    # Check for abstract/philosophical phrases that don't describe visuals
+    abstract_phrases = [
+        'infinite possibilities', 'freedom to', 'open weights', 'philosophy', 'concept', 'idea',
+        'meaning of', 'purpose of', 'essence of', 'nature of', 'truth about'
+    ]
+    
+    has_abstract_phrase = any(phrase in prompt_lower for phrase in abstract_phrases)
+    
+    # If it has abstract phrases but no visual keywords, it's probably not suitable for image generation
+    if has_abstract_phrase and not has_visual_keywords:
+        return (False, "This prompt is too abstract or philosophical. Please describe a visual scene you want to see, like 'a futuristic city at night' or 'abstract geometric patterns in blue and purple'.")
+    
+    # If it has visual keywords, allow it
+    if has_visual_keywords:
         return (True, "")
     
-    # If it has 3+ words and seems descriptive, allow it
-    if len(words) >= 3:
-        return (True, "")
+    # If it's very short (less than 3 words), require more detail
+    if len(words) < 3:
+        return (False, "Please provide more details about the visual scene you want to see.")
     
-    # For edge cases, return a helpful message
-    return (False, "Please provide a clearer description of the background you want to see.")
+    # For longer prompts without obvious visual keywords, be lenient but warn
+    # Let DALL-E try to interpret it, but suggest improvement
+    if len(words) >= 5:
+        return (True, "")  # Allow longer prompts even without obvious keywords
+    
+    # For medium-length prompts without visual keywords, suggest improvement
+    return (False, "This doesn't clearly describe a visual scene. Try describing what you want to see, like 'a cyberpunk cityscape' or 'a serene mountain landscape at sunset'.")
 
 @app.post("/api/generate-image")
 async def generate_image(request: ImageRequest):
