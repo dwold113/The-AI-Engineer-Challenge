@@ -177,12 +177,12 @@ TEST_CASES = [
     ("Edge: Special characters", "test@#$%^&*()", "edge_case", False),
     ("Edge: SQL injection attempt", "'; DROP TABLE users; --", "edge_case", False),
     ("Edge: XSS attempt", "<script>alert('xss')</script>", "edge_case", False),
-    ("Edge: Unicode", "学习中文", "edge_case", False),
+    ("Edge: Unicode", "学习中文", "edge_case", True),  # Chinese "learn Chinese" is valid
     ("Edge: Emoji only", "🎓📚✨", "edge_case", False),
     ("Edge: Newlines/tabs", "test\nnewline\ttab", "edge_case", False),
     ("Edge: Extreme steps request", "python give me 100 steps", "edge_case", True),  # Should work but adjust
     ("Edge: Zero steps", "python give me 0 steps", "edge_case", True),  # Should work but adjust
-    ("Edge: Negative steps", "python give me -5 steps", "edge_case", True),  # Should work but adjust
+    ("Edge: Negative steps", "python give me -5 steps", "edge_case", False),  # Should reject negative steps
     ("Edge: Just 'learning'", "learning", "edge_case", False),
     ("Edge: Just 'how to'", "how to", "edge_case", False),
     ("Edge: Multiple languages", "amharic and spanish and french", "edge_case", True),
