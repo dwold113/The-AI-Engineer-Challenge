@@ -330,7 +330,9 @@ JSON only:"""
         return plan, examples
         
     except Exception as e:
-        print(f"Error generating combined plan and resources: {e}")
+        print(f"[RESOURCES] Error generating combined plan and resources: {type(e).__name__}: {e}")
+        import traceback
+        print(f"[RESOURCES] Traceback: {traceback.format_exc()}")
         # Fallback
         plan = [
             {"title": f"Step 1: Research {topic}", "description": f"Start by researching the basics of {topic} online."},
@@ -338,6 +340,7 @@ JSON only:"""
             {"title": f"Step 3: Practice", "description": f"Try applying what you've learned about {topic} through hands-on practice."}
         ]
         examples = []
+        print(f"[RESOURCES] Using fallback plan, examples count: {len(examples)}")
         
         # Try web scraping as fallback for resources only if we don't have enough
         if len(examples) < num_examples:
