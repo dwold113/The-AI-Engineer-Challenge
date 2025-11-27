@@ -322,6 +322,9 @@ JSON only:"""
         
         print(f"[DEBUG] After validation: {len(examples)} valid resources out of {len(resources[:num_examples])} checked")
         
+        # Determine minimum resources needed (at least 3, or user's request if less)
+        min_resources = min(3, num_examples) if num_examples < 3 else 3
+        
         # Fallback if plan is empty
         if not plan:
             plan = [
@@ -330,7 +333,9 @@ JSON only:"""
                 {"title": f"Step 3: Practice", "description": f"Try applying what you've learned about {topic} through hands-on practice."}
             ]
         
-        return plan, examples
+        # If we don't have enough valid resources, try to get more
+        if len(examples) < min_resources:
+            print(f"[DEBUG] Only {len(examples)} valid resources, need at least {min_resources}. Trying to get more...")
         
     except Exception as e:
         # Fallback
@@ -398,13 +403,18 @@ JSON only:"""
             except Exception as e:
                 print(f"Error in web scraping (non-critical): {e}")
         
-        # Final fallback if we still don't have enough - use AI to generate fallback resources
-        print(f"[DEBUG] Before fallback: {len(examples)} examples")
-        if len(examples) == 0:
-            print(f"[DEBUG] Triggering fallback resource generation...")
+        # Keep trying to get more resources until we have at least min_resources
+        attempts = 0
+        max_attempts = 3  # Try up to 3 times to get enough resources
+        
+        while len(examples) < min_resources and attempts < max_attempts:
+            attempts += 1
+            print(f"[DEBUG] Attempt {attempts}: Have {len(examples)} resources, need {min_resources}. Trying to get more...")
+            
             try:
-                # Use AI to suggest fallback educational resources
-                fallback_prompt = f"""Suggest {num_examples} diverse educational resources for learning about: {topic}
+                # Use AI to suggest additional educational resources
+                needed = min_resources - len(examples) + 2  # Request a few extra to account for validation failures
+                fallback_prompt = f"""Suggest {needed} diverse educational resources for learning about: {topic}
 
 Provide a VARIETY of resources from DIFFERENT platforms:
 - YouTube videos (include relevant videos!)
@@ -413,44 +423,53 @@ Provide a VARIETY of resources from DIFFERENT platforms:
 - Documentation (official docs, MDN, etc.)
 - Community resources (Reddit, forums)
 
-Use DIFFERENT platforms - don't repeat the same one.
+Use DIFFERENT platforms - don't repeat the same one. Avoid URLs already suggested.
 
 JSON: [{{"title": "Resource Name", "url": "https://real-site.com", "description": "Brief"}}, ...]
 
 JSON only:"""
                 
-                fallback_result = call_ai(fallback_prompt, "Expert at finding diverse educational resources. Include a mix of YouTube videos, articles, courses, and documentation from different platforms. Prioritize variety.", max_tokens=300, temperature=0.7)
+                fallback_result = call_ai(fallback_prompt, "Expert at finding diverse educational resources. Include a mix of YouTube videos, articles, courses, and documentation from different platforms. Prioritize variety.", max_tokens=400, temperature=0.7)
                 fallback_resources = parse_json_response(fallback_result)
                 
-                print(f"[DEBUG] Fallback generated {len(fallback_resources)} resources")
+                print(f"[DEBUG] Attempt {attempts} generated {len(fallback_resources)} resources")
                 for i, res in enumerate(fallback_resources, 1):
-                    print(f"[DEBUG] Fallback {i}: {res.get('title', 'No title')} - {res.get('url', 'No URL')}")
+                    print(f"[DEBUG] Attempt {attempts} Resource {i}: {res.get('title', 'No title')} - {res.get('url', 'No URL')}")
                 
-                # Validate fallback URLs in parallel
-                fallback_validation_tasks = [validate_url(resource, topic) for resource in fallback_resources]
-                fallback_results = await asyncio.gather(*fallback_validation_tasks, return_exceptions=True)
+                # Skip resources we already have
+                existing_urls = {ex.get('url') for ex in examples}
+                new_resources = [r for r in fallback_resources if r.get('url') not in existing_urls]
                 
-                for i, result in enumerate(fallback_results, 1):
+                # Validate new URLs in parallel
+                validation_tasks = [validate_url(resource, topic) for resource in new_resources]
+                validation_results = await asyncio.gather(*validation_tasks, return_exceptions=True)
+                
+                for i, result in enumerate(validation_results, 1):
                     if isinstance(result, Exception):
-                        print(f"[DEBUG] Fallback validation {i} raised exception: {type(result).__name__}")
+                        print(f"[DEBUG] Attempt {attempts} validation {i} raised exception: {type(result).__name__}")
                     elif result and isinstance(result, dict):
                         examples.append(result)
-                        print(f"[DEBUG] Fallback validation {i} PASSED: {result.get('title', 'Unknown')}")
+                        print(f"[DEBUG] Attempt {attempts} validation {i} PASSED: {result.get('title', 'Unknown')}")
                     else:
-                        print(f"[DEBUG] Fallback validation {i} FAILED: Resource rejected")
+                        print(f"[DEBUG] Attempt {attempts} validation {i} FAILED: Resource rejected")
                 
-                print(f"[DEBUG] After fallback validation: {len(examples)} valid resources")
+                print(f"[DEBUG] After attempt {attempts}: {len(examples)} valid resources")
                 
-                # If still no resources after validation, include them anyway (better to show than nothing)
-                if len(examples) == 0 and fallback_resources:
-                    for resource in fallback_resources[:num_examples]:
-                        if resource.get("url") and resource.get("url").startswith("http"):
+                # If we still don't have enough and this is the last attempt, include unvalidated resources
+                if len(examples) < min_resources and attempts == max_attempts:
+                    print(f"[DEBUG] Last attempt - including unvalidated resources to reach minimum")
+                    for resource in new_resources:
+                        if len(examples) >= min_resources:
+                            break
+                        if resource.get("url") and resource.get("url").startswith("http") and resource.get('url') not in existing_urls:
                             examples.append({
                                 "title": resource.get("title", f"{topic} Resource"),
                                 "url": resource.get("url"),
                                 "description": resource.get("description", f"Learn about {topic}")
                             })
-            except Exception:
+                            existing_urls.add(resource.get('url'))
+            except Exception as e:
+                print(f"[DEBUG] Attempt {attempts} failed with exception: {type(e).__name__}: {e}")
                 pass
         
         final_count = len(examples[:num_examples])
