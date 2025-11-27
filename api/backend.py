@@ -197,25 +197,30 @@ async def validate_url(resource: dict, topic: str) -> dict | None:
                     print(f"[VALIDATE] Content preview: {content_preview}...")
                     
                     # Use AI to determine if this is an error page or has actual content
+                    # IMPORTANT: Be lenient - only reject obvious error pages, not pages with minimal content
                     validation_prompt = f"""Analyze this webpage content snippet:
 
 URL: {url}
 Content sample: {content_sample[:5000]}
 
-Determine if this page:
-1. Is an error page (404, video unavailable, content removed, etc.)
-2. Has actual useful content that a user can access
+Determine if this page is an ERROR PAGE (like 404, video unavailable, content removed, access denied).
+
+IMPORTANT:
+- If the page has ANY actual content (even minimal), respond "VALID"
+- Only respond "INVALID" if it's clearly an error page with no useful content
+- Pages with navigation, headers, or any real content should be "VALID"
+- Be lenient - when in doubt, choose "VALID"
 
 Respond with ONLY:
-- "VALID" if the page has actual content and is accessible
-- "INVALID" if it's an error page, content unavailable, or broken
+- "VALID" if the page has any actual content (even if minimal)
+- "INVALID" ONLY if it's clearly an error page with no useful content
 
 Response:"""
 
                     print(f"[VALIDATE] Calling AI for content validation...")
                     ai_result = call_ai(
                         validation_prompt,
-                        "Expert at analyzing web pages. Determine if a page is an error page or has actual accessible content. Be strict - only approve pages with real content.",
+                        "Expert at analyzing web pages. You are LENIENT - only reject pages that are clearly error pages with no content. Approve any page with actual content, even if minimal. When in doubt, approve the page.",
                         max_tokens=20,
                         temperature=0.1
                     )
