@@ -165,12 +165,19 @@ async def validate_url(resource: dict, topic: str) -> dict | None:
                 try:
                     content = response.text[:50000].lower()
                     
-                    # Check for strong error indicators (must appear in context suggesting an error page)
-                    # Look for combinations that strongly indicate an error page
-                    strong_error_patterns = [
-                        "video not available",
-                        "video unavailable", 
+                    # Check for error indicators that suggest the page/content is broken
+                    # YouTube-specific errors
+                    youtube_errors = [
+                        "video unavailable",
                         "this video is not available",
+                        "video is unavailable",
+                        "this video has been removed",
+                        "private video",
+                        "video has been removed by the user",
+                    ]
+                    
+                    # General error indicators
+                    general_errors = [
                         "error 404",
                         "page not found",
                         "this content is not available",
@@ -181,11 +188,15 @@ async def validate_url(resource: dict, topic: str) -> dict | None:
                         "the page you're looking for doesn't exist",
                     ]
                     
-                    # Check if content strongly indicates an error page
-                    # Must have at least one strong error pattern AND be a short page (< 500 chars)
-                    # This avoids false positives where "404" appears in valid content
-                    has_error_pattern = any(pattern in content for pattern in strong_error_patterns)
-                    is_short_error_page = len(response.text) < 500 and has_error_pattern
+                    # Check for YouTube errors (more strict - any match is bad)
+                    if "youtube.com" in url.lower() or "youtu.be" in url.lower():
+                        if any(error in content for error in youtube_errors):
+                            # YouTube video is unavailable
+                            return None
+                    
+                    # Check for general errors (must be short page to avoid false positives)
+                    has_general_error = any(error in content for error in general_errors)
+                    is_short_error_page = len(response.text) < 500 and has_general_error
                     
                     if is_short_error_page:
                         # This looks like an error page
