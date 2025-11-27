@@ -150,7 +150,7 @@ async def validate_url(resource: dict, topic: str) -> dict | None:
     try:
         async with httpx.AsyncClient(timeout=5.0, follow_redirects=True) as http_client:
             # Get the page content to verify it's not an error page
-            response = await http_client.get(url, allow_redirects=True)
+            response = await http_client.get(url)
             
             # First check: HTTP status code must be 2xx or 3xx
             status = response.status_code
