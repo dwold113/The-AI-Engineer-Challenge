@@ -174,14 +174,16 @@ Content sample: {content_sample[:8000]}
 
 Determine if this page's PRIMARY RESOURCE is accessible and usable.
 
-CRITICAL DISTINCTION:
+CRITICAL DISTINCTION (understand this concept):
 - A page can have HTML content (navigation, headers, layout) but the PRIMARY RESOURCE might be unavailable
-- For video pages (like YouTube): Check if the VIDEO is playable, not just if the page HTML loads. If it's a video page and the video is unavailable, removed, private, or says "not available anymore", respond "INVALID" - be STRICT for video pages
-- For document pages: Check if the DOCUMENT is readable, not just if the page loads
-- For course pages: Check if the COURSE is accessible, not just if the page loads
-- For general pages: Check if the page content is actually usable
+- For video pages: The page HTML might load, but the VIDEO itself might be unavailable
+- For document pages: The page might load, but the DOCUMENT content might be unavailable
+- For course pages: The page might load, but the COURSE content might be unavailable
+- For general pages: The page content itself is the resource
 
-IMPORTANT:
+IMPORTANT RULES (follow these):
+- For video pages (like YouTube): Check if the VIDEO is playable, not just if the page HTML loads. If the video is unavailable, removed, private, or says "not available anymore", respond "INVALID" - be STRICT
+- For document/course pages: Check if the actual content is accessible, not just if the page loads
 - If the page says the primary resource is unavailable, removed, private, deleted, or not accessible, respond "INVALID"
 - A page with navigation/headers but an unavailable primary resource is INVALID
 - Only respond "VALID" if the primary resource is actually accessible and usable
