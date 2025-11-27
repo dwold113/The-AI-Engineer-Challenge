@@ -165,6 +165,25 @@ async def validate_url(resource: dict, topic: str) -> dict | None:
                 try:
                     # Get a sample of the page content
                     content_sample = response.text[:10000]
+                    content_lower = content_sample.lower()
+                    
+                    # Quick pre-check for obvious YouTube error messages (before AI call for speed)
+                    is_youtube = "youtube.com" in url.lower() or "youtu.be" in url.lower()
+                    if is_youtube:
+                        youtube_error_patterns = [
+                            "this video isn't available anymore",
+                            "video isn't available",
+                            "video unavailable",
+                            "this video is not available",
+                            "video is unavailable",
+                            "this video has been removed",
+                            "video has been removed",
+                            "private video",
+                            "video has been removed by the user",
+                        ]
+                        if any(pattern in content_lower for pattern in youtube_error_patterns):
+                            # YouTube video is explicitly unavailable - reject immediately
+                            return None
                     
                     # Use AI to determine if this page's primary resource is accessible and usable
                     validation_prompt = f"""Analyze this webpage:
