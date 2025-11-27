@@ -143,61 +143,30 @@ async def validate_url(resource: dict, topic: str) -> dict | None:
     """Validate a single URL and return resource dict if valid, None if invalid.
     Checks both HTTP status and page content to ensure it's a working page with actual content."""
     url = resource.get("url", "")
-    title = resource.get("title", "Unknown")
-    
-    print(f"[VALIDATE] Starting validation for: {title}")
-    print(f"[VALIDATE] URL: {url}")
-    
-    # Check 1: URL format validation
-    if not url:
-        print(f"[VALIDATE] ❌ REJECTED {title}: URL is empty")
+    if not url or not url.startswith("http"):
         return None
-    
-    if not url.startswith("http"):
-        print(f"[VALIDATE] ❌ REJECTED {title}: Invalid URL format (must start with http/https) - '{url[:50]}'")
-        return None
-    
-    print(f"[VALIDATE] ✓ URL format is valid")
     
     # Verify URL exists and has valid content
     try:
-        print(f"[VALIDATE] Attempting HTTP request to {url}...")
         async with httpx.AsyncClient(timeout=5.0, follow_redirects=True) as http_client:
             # Get the page content to verify it's not an error page
             response = await http_client.get(url)
             
-            # Check 2: HTTP status code must be 2xx or 3xx
+            # First check: HTTP status code must be 2xx or 3xx
             status = response.status_code
-            print(f"[VALIDATE] HTTP Status Code: {status}")
-            
             if status >= 400:
                 # 4xx or 5xx - URL is broken, reject it
-                print(f"[VALIDATE] ❌ REJECTED {title}: HTTP {status} (4xx/5xx error)")
-                print(f"[VALIDATE] Reason: Server returned error status code")
                 return None
             
-            print(f"[VALIDATE] ✓ HTTP status is valid (2xx/3xx)")
-            
-            # Check 3: Use AI to verify page content is not an error page (only for HTML pages)
+            # Second check: Use AI to verify page content is not an error page (only for HTML pages)
             content_type = response.headers.get("content-type", "").lower()
-            print(f"[VALIDATE] Content-Type: {content_type}")
-            
             if "text/html" in content_type:
-                print(f"[VALIDATE] Content is HTML, performing AI content validation...")
                 # Only check content for HTML pages
                 try:
                     # Get a sample of the page content (first 10KB is enough for AI to analyze)
                     content_sample = response.text[:10000]
-                    content_length = len(response.text)
-                    print(f"[VALIDATE] Page content length: {content_length} characters")
-                    print(f"[VALIDATE] Using first {len(content_sample)} characters for AI analysis")
-                    
-                    # Show a preview of the content
-                    content_preview = content_sample[:200].replace('\n', ' ').strip()
-                    print(f"[VALIDATE] Content preview: {content_preview}...")
                     
                     # Use AI to determine if this is an error page or has actual content
-                    # IMPORTANT: Be lenient - only reject obvious error pages, not pages with minimal content
                     validation_prompt = f"""Analyze this webpage content snippet:
 
 URL: {url}
@@ -206,18 +175,15 @@ Content sample: {content_sample[:5000]}
 Determine if this page is an ERROR PAGE (like 404, video unavailable, content removed, access denied).
 
 IMPORTANT:
-- If the page has ANY actual content (even minimal), respond "VALID"
-- Only respond "INVALID" if it's clearly an error page with no useful content
-- Pages with navigation, headers, or any real content should be "VALID"
+- Only respond "INVALID" if it's clearly an ERROR PAGE
 - Be lenient - when in doubt, choose "VALID"
 
 Respond with ONLY:
 - "VALID" if the page has any actual content (even if minimal)
-- "INVALID" ONLY if it's clearly an error page with no useful content
+- "INVALID" ONLY if it's clearly an ERROR PAGE with no useful content
 
 Response:"""
 
-                    print(f"[VALIDATE] Calling AI for content validation...")
                     ai_result = call_ai(
                         validation_prompt,
                         "Expert at analyzing web pages. You are LENIENT - only reject pages that are clearly error pages with no content. Approve any page with actual content, even if minimal. When in doubt, approve the page.",
@@ -225,37 +191,17 @@ Response:"""
                         temperature=0.1
                     )
                     ai_result_upper = ai_result.upper().strip()
-                    print(f"[VALIDATE] AI raw response: '{ai_result}'")
-                    print(f"[VALIDATE] AI normalized response: '{ai_result_upper}'")
                     
                     # Check for explicit INVALID - be lenient otherwise
                     if ai_result_upper.startswith("INVALID") and len(ai_result_upper) > 5:
                         # AI explicitly determined it's an error page
-                        print(f"[VALIDATE] ❌ REJECTED {title}: AI explicitly determined page is invalid/error page")
-                        print(f"[VALIDATE] AI reasoning: {ai_result}")
                         return None
-                    elif not ai_result_upper.startswith("VALID"):
-                        # AI response is unclear or unexpected - be lenient and include it
-                        print(f"[VALIDATE] ⚠️  WARNING: AI response unclear ('{ai_result_upper}'), but including URL anyway (lenient mode)")
-                        print(f"[VALIDATE] AI raw response was: '{ai_result}'")
-                    else:
-                        print(f"[VALIDATE] ✓ AI validation passed - page has valid content")
-                    
-                except Exception as e:
+                    # If response is unclear, include it anyway (lenient mode)
+                except Exception:
                     # If AI check fails, but status is good, include it (better to show than block)
-                    print(f"[VALIDATE] ⚠️  WARNING: AI check failed for {title} ({url})")
-                    print(f"[VALIDATE] Exception type: {type(e).__name__}")
-                    print(f"[VALIDATE] Exception message: {str(e)}")
-                    print(f"[VALIDATE] Including URL anyway (better to show than block)")
-                    import traceback
-                    print(f"[VALIDATE] Traceback: {traceback.format_exc()}")
-            else:
-                print(f"[VALIDATE] Content is non-HTML ({content_type}), skipping AI content check")
-                print(f"[VALIDATE] ✓ Non-HTML content assumed valid")
+                    pass
             
             # URL passed all checks - it's valid
-            print(f"[VALIDATE] ✅ ACCEPTED {title}: {url}")
-            print(f"[VALIDATE] All validation checks passed")
             return {
                 "title": resource.get("title", f"{topic} Resource"),
                 "url": url,
@@ -264,38 +210,25 @@ Response:"""
                 
     except httpx.HTTPStatusError as e:
         # httpx may raise this for some 4xx/5xx responses
-        print(f"[VALIDATE] Caught HTTPStatusError for {title}")
         if hasattr(e, 'response'):
             status = e.response.status_code
-            print(f"[VALIDATE] Response status code: {status}")
             if 200 <= status < 400:
-                print(f"[VALIDATE] ✅ ACCEPTED {title} despite HTTPStatusError (status is valid)")
                 return {
                     "title": resource.get("title", f"{topic} Resource"),
                     "url": url,
                     "description": resource.get("description", f"Learn about {topic}")
                 }
-        print(f"[VALIDATE] ❌ REJECTED {title}: HTTPStatusError with invalid status")
-        print(f"[VALIDATE] Exception: {type(e).__name__}: {str(e)}")
+        # 4xx or 5xx - broken URL, reject it
         return None
-    except (httpx.TimeoutException, httpx.ConnectError, httpx.RequestError) as e:
+    except (httpx.TimeoutException, httpx.ConnectError, httpx.RequestError):
         # Network errors - can't verify, but might work for users
-        print(f"[VALIDATE] ⚠️  Network error for {title} ({url})")
-        print(f"[VALIDATE] Exception type: {type(e).__name__}")
-        print(f"[VALIDATE] Exception message: {str(e)}")
-        print(f"[VALIDATE] Including URL anyway (network errors may not affect end users)")
         return {
             "title": resource.get("title", f"{topic} Resource"),
             "url": url,
             "description": resource.get("description", f"Learn about {topic}")
         }
-    except Exception as e:
+    except Exception:
         # Other unexpected errors - can't verify, skip it
-        print(f"[VALIDATE] ❌ REJECTED {title}: Unexpected error during validation")
-        print(f"[VALIDATE] Exception type: {type(e).__name__}")
-        print(f"[VALIDATE] Exception message: {str(e)}")
-        import traceback
-        print(f"[VALIDATE] Full traceback: {traceback.format_exc()}")
         return None
 
 async def generate_plan_and_resources(topic: str, num_steps: int = None, num_examples: int = 5) -> tuple[List[Dict[str, str]], List[Dict[str, str]]]:
@@ -349,28 +282,15 @@ JSON only:"""
         plan = data.get("plan", [])
         resources = data.get("resources", [])
         
-        print(f"[RESOURCES] AI generated {len(resources)} resources for topic: {topic}")
-        for i, res in enumerate(resources[:num_examples], 1):
-            print(f"[RESOURCES] {i}. {res.get('title', 'No title')} - {res.get('url', 'No URL')}")
-        
         # Process resources - validate URLs actually exist (in parallel for speed)
-        # Validate all URLs in parallel for speed
-        print(f"[RESOURCES] Starting validation of {len(resources[:num_examples])} URLs...")
         validation_tasks = [validate_url(resource, topic) for resource in resources[:num_examples]]
         validation_results = await asyncio.gather(*validation_tasks, return_exceptions=True)
         
         # Collect valid results
         examples = []
-        for i, result in enumerate(validation_results, 1):
-            if isinstance(result, Exception):
-                print(f"[RESOURCES] Validation task {i} raised exception: {type(result).__name__}: {result}")
-            elif result and isinstance(result, dict):
+        for result in validation_results:
+            if result and isinstance(result, dict):
                 examples.append(result)
-                print(f"[RESOURCES] Added valid resource {i}: {result.get('title', 'Unknown')}")
-            else:
-                print(f"[RESOURCES] Validation task {i} returned None (rejected)")
-        
-        print(f"[RESOURCES] After validation: {len(examples)} valid resources out of {len(resources[:num_examples])} total")
         
         # Fallback if plan is empty
         if not plan:
@@ -383,9 +303,6 @@ JSON only:"""
         return plan, examples
         
     except Exception as e:
-        print(f"[RESOURCES] Error generating combined plan and resources: {type(e).__name__}: {e}")
-        import traceback
-        print(f"[RESOURCES] Traceback: {traceback.format_exc()}")
         # Fallback
         plan = [
             {"title": f"Step 1: Research {topic}", "description": f"Start by researching the basics of {topic} online."},
@@ -393,7 +310,6 @@ JSON only:"""
             {"title": f"Step 3: Practice", "description": f"Try applying what you've learned about {topic} through hands-on practice."}
         ]
         examples = []
-        print(f"[RESOURCES] Using fallback plan, examples count: {len(examples)}")
         
         # Try web scraping as fallback for resources only if we don't have enough
         if len(examples) < num_examples:
@@ -454,7 +370,6 @@ JSON only:"""
         
         # Final fallback if we still don't have enough - use AI to generate fallback resources
         if len(examples) == 0:
-            print(f"[RESOURCES] No valid resources found, trying fallback generation...")
             try:
                 # Use AI to suggest fallback educational resources
                 fallback_prompt = f"""Suggest 3 general educational resources for learning about: {topic}
@@ -468,29 +383,15 @@ JSON only:"""
                 fallback_result = call_ai(fallback_prompt, "Expert at finding educational resources. Provide URLs from well-known educational platforms with standard URLs.", max_tokens=200, temperature=0.5)
                 fallback_resources = parse_json_response(fallback_result)
                 
-                print(f"[RESOURCES] Fallback AI generated {len(fallback_resources)} resources")
-                for i, res in enumerate(fallback_resources, 1):
-                    print(f"[RESOURCES] Fallback {i}. {res.get('title', 'No title')} - {res.get('url', 'No URL')}")
-                
                 # Validate fallback URLs in parallel
-                print(f"[RESOURCES] Starting fallback validation of {len(fallback_resources)} URLs...")
                 fallback_validation_tasks = [validate_url(resource, topic) for resource in fallback_resources]
                 fallback_results = await asyncio.gather(*fallback_validation_tasks, return_exceptions=True)
                 
-                for i, result in enumerate(fallback_results, 1):
-                    if isinstance(result, Exception):
-                        print(f"[RESOURCES] Fallback validation task {i} raised exception: {type(result).__name__}: {result}")
-                    elif result and isinstance(result, dict):
+                for result in fallback_results:
+                    if result and isinstance(result, dict):
                         examples.append(result)
-                        print(f"[RESOURCES] Added fallback resource {i}: {result.get('title', 'Unknown')}")
-                    else:
-                        print(f"[RESOURCES] Fallback validation task {i} returned None (rejected)")
-                
-                print(f"[RESOURCES] After fallback validation: {len(examples)} valid resources")
-            except Exception as e:
-                print(f"[RESOURCES] Error generating fallback resources: {type(e).__name__}: {e}")
-                import traceback
-                print(f"[RESOURCES] Traceback: {traceback.format_exc()}")
+            except Exception:
+                pass
         
         return plan, examples[:num_examples]
 
