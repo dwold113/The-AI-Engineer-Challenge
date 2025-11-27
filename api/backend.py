@@ -182,13 +182,13 @@ CRITICAL DISTINCTION (understand this concept):
 - For general pages: The page content itself is the resource
 
 IMPORTANT RULES (follow these):
-- For video pages (like YouTube): Check if the VIDEO is playable, not just if the page HTML loads. If the video is unavailable, removed, private, or says "not available anymore", respond "INVALID" - be STRICT
+- For video pages (like YouTube): Check if the VIDEO is playable, not just if the page HTML loads. If the video is unavailable, removed, private, or says "not available anymore", respond "INVALID". If the video appears to be available and playable, respond "VALID"
 - For document/course pages: Check if the actual content is accessible, not just if the page loads
 - If the page says the primary resource is unavailable, removed, private, deleted, or not accessible, respond "INVALID"
 - A page with navigation/headers but an unavailable primary resource is INVALID
 - Only respond "VALID" if the primary resource is actually accessible and usable
 - Be lenient for general content pages - when in doubt, choose "VALID"
-- Be STRICT for video pages (like YouTube) - if unsure, respond "INVALID"
+- For video pages: Be strict about detecting errors (unavailable, removed, private), but if the video appears available, approve it
 
 Respond with ONLY:
 - "VALID" if the primary resource is accessible and usable
