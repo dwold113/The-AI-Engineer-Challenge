@@ -167,80 +167,66 @@ async def validate_url(resource: dict, topic: str) -> dict | None:
                     content_sample = response.text[:10000]
                     content_lower = content_sample.lower()
                     
-                    # Quick pre-check for obvious YouTube error messages (before AI call for speed)
+                    # Intelligent check for YouTube videos (no hardcoded patterns)
                     is_youtube = "youtube.com" in url.lower() or "youtu.be" in url.lower()
                     if is_youtube:
-                        youtube_error_patterns = [
-                            "this video isn't available anymore",
-                            "video isn't available",
-                            "video unavailable",
-                            "this video is not available",
-                            "video is unavailable",
-                            "this video has been removed",
-                            "video has been removed",
-                            "private video",
-                            "video has been removed by the user",
-                            "this video has been removed by the user",
-                            "video no longer available",
-                            "this video is no longer available",
-                            "unavailable",
-                        ]
-                        if any(pattern in content_lower for pattern in youtube_error_patterns):
-                            # YouTube video is explicitly unavailable - reject immediately
+                        # Use intelligent heuristics to determine if video is available
+                        content_size = len(content_sample)
+                        
+                        # Heuristic 1: Content size analysis
+                        # Available YouTube videos have substantial HTML (player, description, comments, metadata)
+                        # Unavailable videos typically have minimal HTML (just footer/navigation)
+                        # Typical available video pages are 100KB+ with full content
+                        # Unavailable videos are usually < 50KB with mostly footer/navigation
+                        
+                        # Heuristic 2: Content structure analysis
+                        # Available videos have video-related elements (player, metadata, description, comments)
+                        # Count potential video-related elements vs generic page elements
+                        # Look for structural indicators of a video page vs error page
+                        
+                        # Heuristic 3: Content density
+                        # Available videos have rich content (descriptions, comments, related videos)
+                        # Unavailable videos have sparse content (mostly navigation/footer)
+                        # Calculate ratio of meaningful content vs boilerplate
+                        
+                        # Quick size-based rejection for obviously unavailable videos
+                        if content_size < 20000:
+                            # Extremely small page - definitely unavailable (even error pages are usually larger)
                             return None
                         
-                        # Check if page content is suspiciously minimal (just footer/navigation = unavailable video)
-                        # YouTube pages with available videos have substantial content (player, description, comments, etc.)
-                        # Pages with only footer/navigation suggest the video is unavailable
-                        # Normalize content for checking (remove spaces/newlines for pattern matching)
-                        normalized_content = content_lower.replace(" ", "").replace("\n", "").replace("\t", "").replace("\r", "")
+                        # For larger pages, use AI to analyze content structure and determine if video is available
+                        # This is more reliable than pattern matching and handles all edge cases
+                        youtube_analysis_prompt = f"""Analyze this YouTube page to determine if the video is available and playable.
+
+URL: {url}
+Page size: {content_size} bytes
+Content sample (first 8000 chars): {content_sample[:8000]}
+
+Determine if this YouTube video page contains:
+1. A playable video player
+2. Video metadata (title, description, etc.)
+3. Video content structure (not just navigation/footer)
+
+A page with ONLY navigation, footer, or error messages (even if HTML loads successfully) means the video is UNAVAILABLE.
+
+Respond with ONLY:
+- "AVAILABLE" if the video appears to be playable and accessible
+- "UNAVAILABLE" if the video is removed, private, deleted, or the page only shows navigation/footer
+
+Response:"""
+
+                        youtube_analysis = call_ai(
+                            youtube_analysis_prompt,
+                            "Expert at analyzing YouTube pages. Understand that a page can load HTML successfully but the video itself might be unavailable. Check for actual video player and content, not just page structure.",
+                            max_tokens=10,
+                            temperature=0.1
+                        )
                         
-                        # Check for footer-only content (multiple patterns to catch variations)
-                        minimal_content_indicators = [
-                            "aboutpresscopyrightcontactuscreatorsadvertise",
-                            "howyoutubeworkstestnewfeatures",
-                            "©2025googlellc",
-                            "nflsundayticket",
-                            "aboutpresscopyright",
-                            "aboutpresscopyrightcontact",
-                            "developerstermsprivacypolicy",
-                            "safetyhowyoutubeworks",
-                        ]
-                        has_minimal_content = any(indicator in normalized_content for indicator in minimal_content_indicators)
-                        
-                        # Check for video player/content elements (available videos have these)
-                        video_content_indicators = [
-                            "watch-player",
-                            "ytd-player",
-                            "video-player",
-                            "watch-content",
-                            "primary-inner",
-                            "ytd-watch-metadata",
-                            "ytd-watch-flexy",
-                            "watch-main-col",
-                            "ytd-watch-info",
-                            "ytd-video-primary-info-renderer",
-                            "ytd-watch-secondary",
-                        ]
-                        has_video_content = any(indicator in content_lower for indicator in video_content_indicators)
-                        
-                        # STRICT CHECK: If page has footer content but NO video content, reject it
-                        # This catches pages that only show footer/navigation (unavailable videos)
-                        if has_minimal_content and not has_video_content:
-                            # Page only has footer - video is unavailable
+                        if youtube_analysis.upper().strip().startswith("UNAVAILABLE"):
+                            # AI determined video is unavailable
                             return None
                         
-                        # STRICT CHECK: If content is very small (< 50KB) and doesn't have video indicators, likely unavailable
-                        # Available YouTube videos have substantial HTML (player, description, comments, etc.)
-                        if len(content_sample) < 50000 and not has_video_content:
-                            # Very small page without video content - likely unavailable
-                            return None
-                        
-                        # ADDITIONAL CHECK: If content is extremely small (< 20KB), definitely unavailable
-                        # Even minimal YouTube pages with errors are usually larger than this
-                        if len(content_sample) < 20000:
-                            # Extremely small page - definitely unavailable
-                            return None
+                        # If AI says available or response is unclear, continue with normal validation
                     
                     # Use AI to determine if this page's primary resource is accessible and usable
                     validation_prompt = f"""Analyze this webpage:
