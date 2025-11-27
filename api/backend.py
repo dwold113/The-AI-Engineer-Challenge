@@ -143,8 +143,13 @@ async def validate_url(resource: dict, topic: str) -> dict | None:
     """Validate a single URL and return resource dict if valid, None if invalid.
     Checks both HTTP status and page content to ensure it's a working page with actual content."""
     url = resource.get("url", "")
+    title = resource.get("title", "Unknown")
+    
     if not url or not url.startswith("http"):
+        print(f"[VALIDATE] Rejected {title}: Invalid URL format - {url[:50]}")
         return None
+    
+    print(f"[VALIDATE] Validating: {title} - {url}")
     
     # Verify URL exists and has valid content
     try:
@@ -154,8 +159,11 @@ async def validate_url(resource: dict, topic: str) -> dict | None:
             
             # First check: HTTP status code must be 2xx or 3xx
             status = response.status_code
+            print(f"[VALIDATE] {title} - Status: {status}")
+            
             if status >= 400:
                 # 4xx or 5xx - URL is broken, reject it
+                print(f"[VALIDATE] Rejected {title}: HTTP {status} - {url}")
                 return None
             
             # Second check: Use AI to verify page content is not an error page (only for HTML pages)
@@ -189,17 +197,22 @@ Response:"""
                         temperature=0.1
                     ).upper().strip()
                     
+                    print(f"[VALIDATE] {title} - AI result: {ai_result}")
+                    
                     if not ai_result.startswith("VALID"):
                         # AI determined it's an error page or invalid
+                        print(f"[VALIDATE] Rejected {title}: AI determined invalid - {url}")
                         return None
                     
                 except Exception as e:
                     # If AI check fails, but status is good, include it (better to show than block)
-                    print(f"Error in AI content validation for {url}: {e}")
+                    print(f"[VALIDATE] Warning: AI check failed for {title} ({url}): {e}, including anyway")
                     pass
-            # For non-HTML content (PDFs, JSON, etc.) or if content check passes, include it
+            else:
+                print(f"[VALIDATE] {title} - Non-HTML content ({content_type}), skipping content check")
             
             # URL passed all checks - it's valid
+            print(f"[VALIDATE] Accepted {title}: {url}")
             return {
                 "title": resource.get("title", f"{topic} Resource"),
                 "url": url,
@@ -211,17 +224,17 @@ Response:"""
         if hasattr(e, 'response'):
             status = e.response.status_code
             if 200 <= status < 400:
-                # Actually valid despite exception
+                print(f"[VALIDATE] Accepted {title} despite HTTPStatusError: {url}")
                 return {
                     "title": resource.get("title", f"{topic} Resource"),
                     "url": url,
                     "description": resource.get("description", f"Learn about {topic}")
                 }
-        # 4xx or 5xx - broken URL, reject it
+        print(f"[VALIDATE] Rejected {title}: HTTPStatusError - {url}")
         return None
-    except (httpx.TimeoutException, httpx.ConnectError, httpx.RequestError):
+    except (httpx.TimeoutException, httpx.ConnectError, httpx.RequestError) as e:
         # Network errors - can't verify, but might work for users
-        # Only include if URL looks reasonable (not obviously broken)
+        print(f"[VALIDATE] Network error for {title} ({url}): {type(e).__name__}, including anyway")
         return {
             "title": resource.get("title", f"{topic} Resource"),
             "url": url,
@@ -229,7 +242,7 @@ Response:"""
         }
     except Exception as e:
         # Other unexpected errors - can't verify, skip it
-        print(f"Error validating URL {url}: {e}")
+        print(f"[VALIDATE] Error validating {title} ({url}): {type(e).__name__}: {e}")
         return None
 
 async def generate_plan_and_resources(topic: str, num_steps: int = None, num_examples: int = 5) -> tuple[List[Dict[str, str]], List[Dict[str, str]]]:
@@ -283,16 +296,28 @@ JSON only:"""
         plan = data.get("plan", [])
         resources = data.get("resources", [])
         
+        print(f"[RESOURCES] AI generated {len(resources)} resources for topic: {topic}")
+        for i, res in enumerate(resources[:num_examples], 1):
+            print(f"[RESOURCES] {i}. {res.get('title', 'No title')} - {res.get('url', 'No URL')}")
+        
         # Process resources - validate URLs actually exist (in parallel for speed)
         # Validate all URLs in parallel for speed
+        print(f"[RESOURCES] Starting validation of {len(resources[:num_examples])} URLs...")
         validation_tasks = [validate_url(resource, topic) for resource in resources[:num_examples]]
         validation_results = await asyncio.gather(*validation_tasks, return_exceptions=True)
         
         # Collect valid results
         examples = []
-        for result in validation_results:
-            if result and isinstance(result, dict):
+        for i, result in enumerate(validation_results, 1):
+            if isinstance(result, Exception):
+                print(f"[RESOURCES] Validation task {i} raised exception: {type(result).__name__}: {result}")
+            elif result and isinstance(result, dict):
                 examples.append(result)
+                print(f"[RESOURCES] Added valid resource {i}: {result.get('title', 'Unknown')}")
+            else:
+                print(f"[RESOURCES] Validation task {i} returned None (rejected)")
+        
+        print(f"[RESOURCES] After validation: {len(examples)} valid resources out of {len(resources[:num_examples])} total")
         
         # Fallback if plan is empty
         if not plan:
