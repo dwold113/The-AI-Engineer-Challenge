@@ -193,18 +193,22 @@ async def validate_url(resource: dict, topic: str) -> dict | None:
                         # YouTube pages with available videos have substantial content (player, description, comments, etc.)
                         # Pages with only footer/navigation suggest the video is unavailable
                         # Normalize content for checking (remove spaces/newlines for pattern matching)
-                        normalized_content = content_lower.replace(" ", "").replace("\n", "").replace("\t", "")
+                        normalized_content = content_lower.replace(" ", "").replace("\n", "").replace("\t", "").replace("\r", "")
                         
+                        # Check for footer-only content (multiple patterns to catch variations)
                         minimal_content_indicators = [
                             "aboutpresscopyrightcontactuscreatorsadvertise",
                             "howyoutubeworkstestnewfeatures",
                             "©2025googlellc",
                             "nflsundayticket",
                             "aboutpresscopyright",
+                            "aboutpresscopyrightcontact",
+                            "developerstermsprivacypolicy",
+                            "safetyhowyoutubeworks",
                         ]
                         has_minimal_content = any(indicator in normalized_content for indicator in minimal_content_indicators)
                         
-                        # If page only has footer/navigation and no video-related content, it's likely unavailable
+                        # Check for video player/content elements (available videos have these)
                         video_content_indicators = [
                             "watch-player",
                             "ytd-player",
@@ -214,18 +218,28 @@ async def validate_url(resource: dict, topic: str) -> dict | None:
                             "ytd-watch-metadata",
                             "ytd-watch-flexy",
                             "watch-main-col",
+                            "ytd-watch-info",
+                            "ytd-video-primary-info-renderer",
+                            "ytd-watch-secondary",
                         ]
                         has_video_content = any(indicator in content_lower for indicator in video_content_indicators)
                         
-                        # If we see minimal footer content but no video player/content, reject it
-                        # Also check if content is suspiciously small (unavailable videos often have minimal HTML)
+                        # STRICT CHECK: If page has footer content but NO video content, reject it
+                        # This catches pages that only show footer/navigation (unavailable videos)
                         if has_minimal_content and not has_video_content:
                             # Page only has footer - video is unavailable
                             return None
                         
-                        # Additional check: if content is very small and doesn't have video indicators, likely unavailable
-                        if len(content_sample) < 30000 and not has_video_content:
+                        # STRICT CHECK: If content is very small (< 50KB) and doesn't have video indicators, likely unavailable
+                        # Available YouTube videos have substantial HTML (player, description, comments, etc.)
+                        if len(content_sample) < 50000 and not has_video_content:
                             # Very small page without video content - likely unavailable
+                            return None
+                        
+                        # ADDITIONAL CHECK: If content is extremely small (< 20KB), definitely unavailable
+                        # Even minimal YouTube pages with errors are usually larger than this
+                        if len(content_sample) < 20000:
+                            # Extremely small page - definitely unavailable
                             return None
                     
                     # Use AI to determine if this page's primary resource is accessible and usable
