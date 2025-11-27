@@ -166,35 +166,8 @@ async def validate_url(resource: dict, topic: str) -> dict | None:
                     # Get a sample of the page content (first 10KB is enough for AI to analyze)
                     content_sample = response.text[:10000]
                     
-                    # Determine if this is a YouTube URL
-                    is_youtube = "youtube.com" in url.lower() or "youtu.be" in url.lower()
-                    
                     # Use AI to determine if this is an error page or has actual content
-                    # Different prompts for YouTube vs other sites
-                    if is_youtube:
-                        validation_prompt = f"""Analyze this YouTube page:
-
-URL: {url}
-Content sample: {content_sample[:5000]}
-
-Determine if this YouTube video is available and accessible.
-
-IMPORTANT for YouTube:
-- Respond "INVALID" if it's clearly an ERROR PAGE
-- If the page says the video is unavailable, removed, private, or not available, respond "INVALID"
-- YouTube error pages have navigation/headers but the video itself is unavailable - this is INVALID
-- Be STRICT for YouTube - if video is unavailable, it's INVALID even if page has other content
-- Only respond "VALID" if the video is actually accessible and playable
-
-Respond with ONLY:
-- "VALID" if the video is available and playable
-- "INVALID" if the video is unavailable, removed, private, or not accessible
-
-Response:"""
-                        
-                        system_message = "Expert at analyzing YouTube pages. Be STRICT for YouTube - if a video is unavailable, removed, or private, it's INVALID. YouTube error pages have navigation/headers but the video itself is unavailable - this is INVALID. Only approve videos that are actually accessible and playable."
-                    else:
-                        validation_prompt = f"""Analyze this webpage content snippet:
+                    validation_prompt = f"""Analyze this webpage content snippet:
 
 URL: {url}
 Content sample: {content_sample[:5000]}
@@ -202,7 +175,7 @@ Content sample: {content_sample[:5000]}
 Determine if this page is an ERROR PAGE (like 404, video unavailable, content removed, access denied).
 
 IMPORTANT:
-- Respond "INVALID" if it's clearly an ERROR PAGE
+- Only respond "INVALID" if it's clearly an ERROR PAGE
 - Be lenient - when in doubt, choose "VALID"
 
 Respond with ONLY:
@@ -210,12 +183,10 @@ Respond with ONLY:
 - "INVALID" ONLY if it's clearly an ERROR PAGE with no useful content
 
 Response:"""
-                        
-                        system_message = "Expert at analyzing web pages. You are LENIENT - only reject pages that are clearly error pages with no content. Approve any page with actual content, even if minimal. When in doubt, approve the page."
 
                     ai_result = call_ai(
                         validation_prompt,
-                        system_message,
+                        "Expert at analyzing web pages. You are LENIENT - only reject pages that are clearly error pages with no content. Approve any page with actual content, even if minimal. When in doubt, approve the page.",
                         max_tokens=20,
                         temperature=0.1
                     )
