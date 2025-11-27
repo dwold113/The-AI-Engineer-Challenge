@@ -192,42 +192,77 @@ async def validate_url(resource: dict, topic: str) -> dict | None:
                                 # No video structure found - page is likely unavailable
                                 return None
                         
-                        # STRICT CHECK 2: AI analysis with strict default
+                        # STRICT CHECK 2: Quick content check for obvious unavailable indicators
+                        # Check for common "unavailable" messages in the content before AI call
+                        unavailable_indicators = [
+                            "this video isn't available",
+                            "video unavailable",
+                            "video is unavailable",
+                            "this video is no longer available",
+                            "video has been removed",
+                            "private video",
+                            "video unavailable",
+                            "unavailable",
+                        ]
+                        content_text = content_sample.lower()
+                        if any(indicator in content_text for indicator in unavailable_indicators):
+                            # Explicit unavailable message found - reject immediately
+                            return None
+                        
+                        # STRICT CHECK 3: AI analysis with strict default
                         # Use AI to definitively determine if video is available
                         # DEFAULT TO REJECTING if AI check fails or is unclear
                         try:
-                            youtube_analysis_prompt = f"""Analyze this YouTube page to determine if the video is available and playable.
+                            # Get more content for better analysis (up to 15000 chars)
+                            extended_content = content_sample[:15000]
+                            
+                            youtube_analysis_prompt = f"""Analyze this YouTube page to determine if the video is ACTUALLY AVAILABLE and PLAYABLE.
 
 URL: {url}
 Page size: {content_size} bytes
-Content sample: {content_sample[:10000]}
+Full content sample: {extended_content}
 
-CRITICAL: A page with ONLY navigation, footer, copyright notices, or error messages means the video is UNAVAILABLE.
-Even if the HTML page loads successfully, if there's no video player, no video metadata, no description, and only shows footer/navigation, the video is UNAVAILABLE.
+CRITICAL INSTRUCTIONS:
+- A YouTube page can load HTML successfully but the VIDEO itself might be unavailable
+- If the page only shows navigation, footer, copyright notices, or error messages, the video is UNAVAILABLE
+- If there's no actual video player that can play content, the video is UNAVAILABLE
+- If the page says "video unavailable", "this video isn't available", or similar, the video is UNAVAILABLE
+- Even if some HTML elements exist, if the primary video content is missing, it's UNAVAILABLE
 
-Check for:
-1. Video player element (ytd-player, watch-player, etc.)
-2. Video metadata (title, description, channel info)
-3. Video content structure (not just navigation/footer)
+You MUST check for:
+1. An actual playable video player (not just page structure)
+2. Video metadata that indicates a real video exists (title, description, channel)
+3. Video content structure (not just navigation/footer/boilerplate)
+
+ONLY respond "AVAILABLE" if:
+- The video player is clearly present AND functional
+- Video metadata exists AND indicates a real video
+- The page has substantial video-related content (not just navigation/footer)
 
 Respond with ONLY:
-- "AVAILABLE" if the video player and content are clearly present and the video appears playable
-- "UNAVAILABLE" if the page only has navigation/footer, no video player, or the video is removed/private/deleted
+- "AVAILABLE" if the video is clearly available and playable (be very strict)
+- "UNAVAILABLE" if the video is removed, private, deleted, or the page only shows navigation/footer/errors
 
 Response:"""
 
                             youtube_analysis = call_ai(
                                 youtube_analysis_prompt,
-                                "Expert at analyzing YouTube pages. Be STRICT - a page that only loads navigation/footer without video player means the video is UNAVAILABLE. Only respond AVAILABLE if video player and content are clearly present.",
+                                "Expert at analyzing YouTube pages. Be EXTREMELY STRICT. A page that loads but has no playable video player means UNAVAILABLE. A page with only navigation/footer means UNAVAILABLE. Only respond AVAILABLE if you are 100% certain the video player and content are present and the video is playable. When in doubt, respond UNAVAILABLE.",
                                 max_tokens=10,
-                                temperature=0.1
+                                temperature=0.0  # Use 0.0 for maximum determinism
                             )
                             
                             analysis_upper = youtube_analysis.upper().strip()
                             
-                            # Only accept if AI explicitly says AVAILABLE
+                            # Only accept if AI explicitly says AVAILABLE (be very strict)
                             if not analysis_upper.startswith("AVAILABLE"):
                                 # AI said UNAVAILABLE or response is unclear - reject it
+                                return None
+                            
+                            # Double-check: Even if AI says AVAILABLE, verify it's not just a false positive
+                            # If content is suspiciously small or lacks video structure, reject anyway
+                            if content_size < 50000 and not has_video_structure:
+                                # Content too small and no video structure - reject even if AI said available
                                 return None
                             
                         except Exception as e:
