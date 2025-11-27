@@ -158,43 +158,43 @@ async def validate_url(resource: dict, topic: str) -> dict | None:
                 # 4xx or 5xx - URL is broken, reject it
                 return None
             
-            # Second check: Verify page content is not an error page
-            # Get text content (limit to first 50KB to avoid huge pages)
-            try:
-                content = response.text[:50000].lower()
-                
-                # Check for common error indicators in the content
-                error_indicators = [
-                    "video not available",
-                    "video unavailable",
-                    "this video is not available",
-                    "page not found",
-                    "404",
-                    "not found",
-                    "error 404",
-                    "this content is not available",
-                    "content unavailable",
-                    "access denied",
-                    "forbidden",
-                    "this page doesn't exist",
-                    "the page you're looking for",
-                    "sorry, we couldn't find",
-                    "the requested page",
-                ]
-                
-                # If page contains error indicators, it's broken
-                if any(indicator in content for indicator in error_indicators):
-                    return None
-                
-                # Check if page has minimal content (at least 200 chars suggests real content)
-                # Very short pages might be error pages
-                if len(response.text) < 200:
-                    return None
-                
-            except Exception:
-                # If we can't parse content, but status is good, include it
-                # Some pages might not be text/html
-                pass
+            # Second check: Verify page content is not an error page (only for HTML pages)
+            content_type = response.headers.get("content-type", "").lower()
+            if "text/html" in content_type:
+                # Only check content for HTML pages
+                try:
+                    content = response.text[:50000].lower()
+                    
+                    # Check for strong error indicators (must appear in context suggesting an error page)
+                    # Look for combinations that strongly indicate an error page
+                    strong_error_patterns = [
+                        "video not available",
+                        "video unavailable", 
+                        "this video is not available",
+                        "error 404",
+                        "page not found",
+                        "this content is not available",
+                        "content unavailable",
+                        "access denied",
+                        "this page doesn't exist",
+                        "sorry, we couldn't find that page",
+                        "the page you're looking for doesn't exist",
+                    ]
+                    
+                    # Check if content strongly indicates an error page
+                    # Must have at least one strong error pattern AND be a short page (< 500 chars)
+                    # This avoids false positives where "404" appears in valid content
+                    has_error_pattern = any(pattern in content for pattern in strong_error_patterns)
+                    is_short_error_page = len(response.text) < 500 and has_error_pattern
+                    
+                    if is_short_error_page:
+                        # This looks like an error page
+                        return None
+                    
+                except Exception:
+                    # If we can't parse content, but status is good, include it
+                    pass
+            # For non-HTML content (PDFs, JSON, etc.) or if content check passes, include it
             
             # URL passed all checks - it's valid
             return {
