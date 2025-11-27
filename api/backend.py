@@ -299,15 +299,28 @@ JSON only:"""
         plan = data.get("plan", [])
         resources = data.get("resources", [])
         
+        print(f"[DEBUG] Topic: {topic}")
+        print(f"[DEBUG] Requested num_examples: {num_examples}")
+        print(f"[DEBUG] AI generated {len(resources)} resources")
+        for i, res in enumerate(resources, 1):
+            print(f"[DEBUG] Resource {i}: {res.get('title', 'No title')} - {res.get('url', 'No URL')}")
+        
         # Process resources - validate URLs actually exist (in parallel for speed)
         validation_tasks = [validate_url(resource, topic) for resource in resources[:num_examples]]
         validation_results = await asyncio.gather(*validation_tasks, return_exceptions=True)
         
         # Collect valid results
         examples = []
-        for result in validation_results:
-            if result and isinstance(result, dict):
+        for i, result in enumerate(validation_results, 1):
+            if isinstance(result, Exception):
+                print(f"[DEBUG] Validation {i} raised exception: {type(result).__name__}")
+            elif result and isinstance(result, dict):
                 examples.append(result)
+                print(f"[DEBUG] Validation {i} PASSED: {result.get('title', 'Unknown')}")
+            else:
+                print(f"[DEBUG] Validation {i} FAILED: Resource rejected")
+        
+        print(f"[DEBUG] After validation: {len(examples)} valid resources out of {len(resources[:num_examples])} checked")
         
         # Fallback if plan is empty
         if not plan:
@@ -386,7 +399,9 @@ JSON only:"""
                 print(f"Error in web scraping (non-critical): {e}")
         
         # Final fallback if we still don't have enough - use AI to generate fallback resources
+        print(f"[DEBUG] Before fallback: {len(examples)} examples")
         if len(examples) == 0:
+            print(f"[DEBUG] Triggering fallback resource generation...")
             try:
                 # Use AI to suggest fallback educational resources
                 fallback_prompt = f"""Suggest {num_examples} diverse educational resources for learning about: {topic}
@@ -407,13 +422,24 @@ JSON only:"""
                 fallback_result = call_ai(fallback_prompt, "Expert at finding diverse educational resources. Include a mix of YouTube videos, articles, courses, and documentation from different platforms. Prioritize variety.", max_tokens=300, temperature=0.7)
                 fallback_resources = parse_json_response(fallback_result)
                 
+                print(f"[DEBUG] Fallback generated {len(fallback_resources)} resources")
+                for i, res in enumerate(fallback_resources, 1):
+                    print(f"[DEBUG] Fallback {i}: {res.get('title', 'No title')} - {res.get('url', 'No URL')}")
+                
                 # Validate fallback URLs in parallel
                 fallback_validation_tasks = [validate_url(resource, topic) for resource in fallback_resources]
                 fallback_results = await asyncio.gather(*fallback_validation_tasks, return_exceptions=True)
                 
-                for result in fallback_results:
-                    if result and isinstance(result, dict):
+                for i, result in enumerate(fallback_results, 1):
+                    if isinstance(result, Exception):
+                        print(f"[DEBUG] Fallback validation {i} raised exception: {type(result).__name__}")
+                    elif result and isinstance(result, dict):
                         examples.append(result)
+                        print(f"[DEBUG] Fallback validation {i} PASSED: {result.get('title', 'Unknown')}")
+                    else:
+                        print(f"[DEBUG] Fallback validation {i} FAILED: Resource rejected")
+                
+                print(f"[DEBUG] After fallback validation: {len(examples)} valid resources")
                 
                 # If still no resources after validation, include them anyway (better to show than nothing)
                 if len(examples) == 0 and fallback_resources:
@@ -427,6 +453,8 @@ JSON only:"""
             except Exception:
                 pass
         
+        final_count = len(examples[:num_examples])
+        print(f"[DEBUG] Final result: Returning {final_count} resources (requested: {num_examples})")
         return plan, examples[:num_examples]
 
 def extract_validate_and_prepare_topic(topic: str) -> tuple[str, int, str, int, bool, str]:
