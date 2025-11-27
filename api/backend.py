@@ -145,34 +145,56 @@ async def validate_url(resource: dict, topic: str) -> dict | None:
     url = resource.get("url", "")
     title = resource.get("title", "Unknown")
     
-    if not url or not url.startswith("http"):
-        print(f"[VALIDATE] Rejected {title}: Invalid URL format - {url[:50]}")
+    print(f"[VALIDATE] Starting validation for: {title}")
+    print(f"[VALIDATE] URL: {url}")
+    
+    # Check 1: URL format validation
+    if not url:
+        print(f"[VALIDATE] ❌ REJECTED {title}: URL is empty")
         return None
     
-    print(f"[VALIDATE] Validating: {title} - {url}")
+    if not url.startswith("http"):
+        print(f"[VALIDATE] ❌ REJECTED {title}: Invalid URL format (must start with http/https) - '{url[:50]}'")
+        return None
+    
+    print(f"[VALIDATE] ✓ URL format is valid")
     
     # Verify URL exists and has valid content
     try:
+        print(f"[VALIDATE] Attempting HTTP request to {url}...")
         async with httpx.AsyncClient(timeout=5.0, follow_redirects=True) as http_client:
             # Get the page content to verify it's not an error page
             response = await http_client.get(url)
             
-            # First check: HTTP status code must be 2xx or 3xx
+            # Check 2: HTTP status code must be 2xx or 3xx
             status = response.status_code
-            print(f"[VALIDATE] {title} - Status: {status}")
+            print(f"[VALIDATE] HTTP Status Code: {status}")
             
             if status >= 400:
                 # 4xx or 5xx - URL is broken, reject it
-                print(f"[VALIDATE] Rejected {title}: HTTP {status} - {url}")
+                print(f"[VALIDATE] ❌ REJECTED {title}: HTTP {status} (4xx/5xx error)")
+                print(f"[VALIDATE] Reason: Server returned error status code")
                 return None
             
-            # Second check: Use AI to verify page content is not an error page (only for HTML pages)
+            print(f"[VALIDATE] ✓ HTTP status is valid (2xx/3xx)")
+            
+            # Check 3: Use AI to verify page content is not an error page (only for HTML pages)
             content_type = response.headers.get("content-type", "").lower()
+            print(f"[VALIDATE] Content-Type: {content_type}")
+            
             if "text/html" in content_type:
+                print(f"[VALIDATE] Content is HTML, performing AI content validation...")
                 # Only check content for HTML pages
                 try:
                     # Get a sample of the page content (first 10KB is enough for AI to analyze)
                     content_sample = response.text[:10000]
+                    content_length = len(response.text)
+                    print(f"[VALIDATE] Page content length: {content_length} characters")
+                    print(f"[VALIDATE] Using first {len(content_sample)} characters for AI analysis")
+                    
+                    # Show a preview of the content
+                    content_preview = content_sample[:200].replace('\n', ' ').strip()
+                    print(f"[VALIDATE] Content preview: {content_preview}...")
                     
                     # Use AI to determine if this is an error page or has actual content
                     validation_prompt = f"""Analyze this webpage content snippet:
@@ -190,29 +212,40 @@ Respond with ONLY:
 
 Response:"""
 
+                    print(f"[VALIDATE] Calling AI for content validation...")
                     ai_result = call_ai(
                         validation_prompt,
                         "Expert at analyzing web pages. Determine if a page is an error page or has actual accessible content. Be strict - only approve pages with real content.",
                         max_tokens=20,
                         temperature=0.1
-                    ).upper().strip()
+                    )
+                    ai_result_upper = ai_result.upper().strip()
+                    print(f"[VALIDATE] AI raw response: '{ai_result}'")
+                    print(f"[VALIDATE] AI normalized response: '{ai_result_upper}'")
                     
-                    print(f"[VALIDATE] {title} - AI result: {ai_result}")
-                    
-                    if not ai_result.startswith("VALID"):
+                    if not ai_result_upper.startswith("VALID"):
                         # AI determined it's an error page or invalid
-                        print(f"[VALIDATE] Rejected {title}: AI determined invalid - {url}")
+                        print(f"[VALIDATE] ❌ REJECTED {title}: AI determined page is invalid/error page")
+                        print(f"[VALIDATE] AI reasoning: {ai_result}")
                         return None
+                    
+                    print(f"[VALIDATE] ✓ AI validation passed - page has valid content")
                     
                 except Exception as e:
                     # If AI check fails, but status is good, include it (better to show than block)
-                    print(f"[VALIDATE] Warning: AI check failed for {title} ({url}): {e}, including anyway")
-                    pass
+                    print(f"[VALIDATE] ⚠️  WARNING: AI check failed for {title} ({url})")
+                    print(f"[VALIDATE] Exception type: {type(e).__name__}")
+                    print(f"[VALIDATE] Exception message: {str(e)}")
+                    print(f"[VALIDATE] Including URL anyway (better to show than block)")
+                    import traceback
+                    print(f"[VALIDATE] Traceback: {traceback.format_exc()}")
             else:
-                print(f"[VALIDATE] {title} - Non-HTML content ({content_type}), skipping content check")
+                print(f"[VALIDATE] Content is non-HTML ({content_type}), skipping AI content check")
+                print(f"[VALIDATE] ✓ Non-HTML content assumed valid")
             
             # URL passed all checks - it's valid
-            print(f"[VALIDATE] Accepted {title}: {url}")
+            print(f"[VALIDATE] ✅ ACCEPTED {title}: {url}")
+            print(f"[VALIDATE] All validation checks passed")
             return {
                 "title": resource.get("title", f"{topic} Resource"),
                 "url": url,
@@ -221,20 +254,26 @@ Response:"""
                 
     except httpx.HTTPStatusError as e:
         # httpx may raise this for some 4xx/5xx responses
+        print(f"[VALIDATE] Caught HTTPStatusError for {title}")
         if hasattr(e, 'response'):
             status = e.response.status_code
+            print(f"[VALIDATE] Response status code: {status}")
             if 200 <= status < 400:
-                print(f"[VALIDATE] Accepted {title} despite HTTPStatusError: {url}")
+                print(f"[VALIDATE] ✅ ACCEPTED {title} despite HTTPStatusError (status is valid)")
                 return {
                     "title": resource.get("title", f"{topic} Resource"),
                     "url": url,
                     "description": resource.get("description", f"Learn about {topic}")
                 }
-        print(f"[VALIDATE] Rejected {title}: HTTPStatusError - {url}")
+        print(f"[VALIDATE] ❌ REJECTED {title}: HTTPStatusError with invalid status")
+        print(f"[VALIDATE] Exception: {type(e).__name__}: {str(e)}")
         return None
     except (httpx.TimeoutException, httpx.ConnectError, httpx.RequestError) as e:
         # Network errors - can't verify, but might work for users
-        print(f"[VALIDATE] Network error for {title} ({url}): {type(e).__name__}, including anyway")
+        print(f"[VALIDATE] ⚠️  Network error for {title} ({url})")
+        print(f"[VALIDATE] Exception type: {type(e).__name__}")
+        print(f"[VALIDATE] Exception message: {str(e)}")
+        print(f"[VALIDATE] Including URL anyway (network errors may not affect end users)")
         return {
             "title": resource.get("title", f"{topic} Resource"),
             "url": url,
@@ -242,7 +281,11 @@ Response:"""
         }
     except Exception as e:
         # Other unexpected errors - can't verify, skip it
-        print(f"[VALIDATE] Error validating {title} ({url}): {type(e).__name__}: {e}")
+        print(f"[VALIDATE] ❌ REJECTED {title}: Unexpected error during validation")
+        print(f"[VALIDATE] Exception type: {type(e).__name__}")
+        print(f"[VALIDATE] Exception message: {str(e)}")
+        import traceback
+        print(f"[VALIDATE] Full traceback: {traceback.format_exc()}")
         return None
 
 async def generate_plan_and_resources(topic: str, num_steps: int = None, num_examples: int = 5) -> tuple[List[Dict[str, str]], List[Dict[str, str]]]:
