@@ -146,7 +146,14 @@ JSON only:"""
         
         # If we can extract a reasonable topic, default to valid (be lenient)
         # Only reject if topic is clearly gibberish or empty
-        if len(clean_topic) < 2 or not clean_topic.replace(' ', '').isalnum():
+        # Handle special characters gracefully
+        try:
+            is_alnum = clean_topic.replace(' ', '').isalnum()
+        except Exception:
+            # If isalnum() fails (e.g., with certain unicode), be lenient
+            is_alnum = len(clean_topic.replace(' ', '')) > 0
+        
+        if len(clean_topic) < 2 or not is_alnum:
             is_valid = False
             validation_message = "Unable to validate this topic. Please enter a clear, learnable subject, skill, or concept."
         else:

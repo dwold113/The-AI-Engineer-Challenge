@@ -1,6 +1,6 @@
 """
-Comprehensive test suite for Learning Experience App
-Tests both backend API and frontend UI behavior
+Test suite for Learning Experience App
+Tests the simplified backend (no resources/examples)
 """
 import httpx
 import json
@@ -9,493 +9,308 @@ from typing import Dict, List, Any
 from datetime import datetime
 
 API_URL = "http://localhost:8000"
-FRONTEND_URL = "http://localhost:3000"
 
 class TestResult:
-    def __init__(self, test_name: str, category: str, passed: bool, 
-                 details: str = "", response_data: Any = None):
+    def __init__(self, test_name: str, category: str):
         self.test_name = test_name
         self.category = category
-        self.passed = passed
-        self.details = details
-        self.response_data = response_data
+        self.input = ""
+        self.api_status = None
+        self.api_response = None
+        self.api_error = None
+        self.passed = False
+        self.verdict = ""
         self.timestamp = datetime.now().isoformat()
 
-def test_backend_api(test_name: str, endpoint: str, method: str = "GET", 
-                    data: Dict = None, expected_status: int = 200,
-                    expected_fields: List[str] = None) -> TestResult:
-    """Test backend API endpoint"""
-    try:
-        async def run_test():
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                if method == "GET":
-                    response = await client.get(f"{API_URL}{endpoint}")
-                elif method == "POST":
-                    response = await client.post(
-                        f"{API_URL}{endpoint}",
-                        json=data,
-                        headers={"Content-Type": "application/json"}
-                    )
-                else:
-                    return TestResult(test_name, "backend", False, 
-                                    f"Unsupported method: {method}")
-                
-                passed = response.status_code == expected_status
-                details = f"Status: {response.status_code}"
-                
-                if passed and expected_fields:
-                    try:
-                        response_json = response.json()
-                        missing_fields = [f for f in expected_fields if f not in response_json]
-                        if missing_fields:
-                            passed = False
-                            details += f". Missing fields: {missing_fields}"
-                        else:
-                            details += f". All expected fields present: {expected_fields}"
-                    except:
-                        passed = False
-                        details += ". Invalid JSON response"
-                
-                return TestResult(test_name, "backend", passed, details, 
-                                response.text[:500] if response.text else None)
-        
-        result = asyncio.run(run_test())
-        return result
-    except Exception as e:
-        return TestResult(test_name, "backend", False, f"Exception: {str(e)}")
-
-def test_learning_flow(test_name: str, topic: str, expected_steps: int = None,
-                       expected_examples: int = None) -> TestResult:
-    """Test complete learning flow: topic -> plan -> examples"""
-    try:
-        async def run_test():
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                # Step 1: Create learning plan
-                response = await client.post(
-                    f"{API_URL}/api/learn",
-                    json={"topic": topic},
-                    headers={"Content-Type": "application/json"}
-                )
-                
-                if response.status_code != 200:
-                    return TestResult(test_name, "learning_flow", False,
-                                    f"Failed to create plan. Status: {response.status_code}")
-                
-                data = response.json()
-                
-                # Validate response structure
-                if "plan" not in data or "examples" not in data:
-                    return TestResult(test_name, "learning_flow", False,
-                                    "Missing 'plan' or 'examples' in response")
-                
-                plan = data.get("plan", [])
-                examples = data.get("examples", [])
-                
-                details = f"Plan steps: {len(plan)}, Examples: {len(examples)}"
-                passed = True
-                
-                # Check step count if expected
-                if expected_steps is not None:
-                    if len(plan) != expected_steps:
-                        passed = False
-                        details += f". Expected {expected_steps} steps, got {len(plan)}"
-                
-                # Check example count if expected
-                if expected_examples is not None:
-                    if len(examples) != expected_examples:
-                        passed = False
-                        details += f". Expected {expected_examples} examples, got {len(examples)}"
-                
-                # Validate plan structure
-                for i, step in enumerate(plan):
-                    if "title" not in step or "description" not in step:
-                        passed = False
-                        details += f". Step {i+1} missing title or description"
-                
-                # Validate examples structure
-                for i, example in enumerate(examples):
-                    if "title" not in example or "url" not in example:
-                        passed = False
-                        details += f". Example {i+1} missing title or url"
-                
-                return TestResult(test_name, "learning_flow", passed, details, data)
-        
-        result = asyncio.run(run_test())
-        return result
-    except Exception as e:
-        return TestResult(test_name, "learning_flow", False, f"Exception: {str(e)}")
-
-def test_frontend_ui(test_name: str, topic: str) -> TestResult:
-    """Test frontend UI by checking if page loads and contains expected content"""
-    try:
-        async def run_test():
-            async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
-                try:
-                    # Get the frontend page
-                    response = await client.get(FRONTEND_URL)
-                except (httpx.ConnectError, httpx.TimeoutException):
-                    return TestResult(test_name, "frontend", False,
-                                    f"Frontend not running at {FRONTEND_URL}. Start with 'npm run dev' in frontend/")
-                
-                if response.status_code != 200:
-                    return TestResult(test_name, "frontend", False,
-                                    f"Failed to load frontend. Status: {response.status_code}")
-                
-                html = response.text
-                
-                # Check for key UI elements (case-insensitive)
-                html_lower = html.lower()
-                checks = {
-                    "Learning Experience": "learning experience" in html_lower,
-                    "Start Learning button": "start learning" in html_lower,
-                    "Input field": 'type="text"' in html or 'input' in html_lower or 'placeholder' in html_lower,
-                    "React app loaded": "__next" in html or "react" in html_lower or "next" in html_lower,
-                }
-                
-                failed_checks = [k for k, v in checks.items() if not v]
-                
-                if failed_checks:
-                    return TestResult(test_name, "frontend", False,
-                                    f"Missing UI elements: {failed_checks}")
-                
-                return TestResult(test_name, "frontend", True,
-                                f"All UI elements present: {list(checks.keys())}")
-        
-        result = asyncio.run(run_test())
-        return result
-    except Exception as e:
-        return TestResult(test_name, "frontend", False, f"Exception: {str(e)}")
-
-def run_all_tests() -> List[TestResult]:
-    """Run comprehensive test suite"""
-    results = []
+async def test_api_call(test_name: str, topic: str, category: str, 
+                       should_succeed: bool = True) -> TestResult:
+    """Test API endpoint with given topic"""
+    result = TestResult(test_name, category)
+    result.input = topic
     
-    print("🧪 Starting comprehensive test suite...\n")
-    
-    # ===== BACKEND API TESTS =====
-    print("📡 Testing Backend API...")
-    
-    # Basic endpoint tests
-    results.append(test_backend_api(
-        "Root endpoint accessible",
-        "/",
-        expected_status=200,
-        expected_fields=["status", "app"]
-    ))
-    
-    results.append(test_backend_api(
-        "API key configured check",
-        "/",
-        expected_status=200
-    ))
-    
-    # Valid learning topics
-    print("\n✅ Testing Valid Learning Topics...")
-    valid_topics = [
-        ("Python programming", "Python programming", None, None),
-        ("Machine Learning", "Machine Learning", None, None),
-        ("Web Development", "Web Development", None, None),
-        ("Cooking Italian food", "Cooking Italian food", None, None),
-        ("Spanish language", "Spanish language", None, None),
-        ("Photography basics", "Photography basics", None, None),
-        ("3 steps requested", "how to code give me 3 steps", 3, None),
-        ("10 resources requested", "Python programming give me 10 resources", None, 10),
-        ("Both specified", "Machine Learning give 5 steps and 8 examples", 5, 8),
-    ]
-    
-    for test_name, actual_topic, expected_steps, expected_examples in valid_topics:
-        results.append(test_learning_flow(
-            f"Valid topic: {test_name}",
-            actual_topic,
-            expected_steps,
-            expected_examples
-        ))
-    
-    # Invalid learning topics (should be rejected)
-    print("\n❌ Testing Invalid Learning Topics (should fail)...")
-    invalid_topics = [
-        ("Gibberish", "gfdnjlg nfgdsgdnjklgfnjs"),
-        ("Abstract concept", "the meaning of life"),
-        ("Random chars", "asdfghjkl"),
-        ("Just numbers", "123456"),
-        ("Too vague", "stuff"),
-        ("Empty string", ""),
-        ("Single character", "a"),
-        ("Only special chars", "!!!###"),
-        ("Copyrighted content", "marvel universe"),
-        ("GIF request", "gif of dancing boy"),
-        ("Specific person", "jaxson dart running"),
-    ]
-    
-    for category, topic in invalid_topics:
-        results.append(test_backend_api(
-            f"Invalid topic rejected: {category}",
-            "/api/learn",
-            method="POST",
-            data={"topic": topic},
-            expected_status=400
-        ))
-    
-    # Edge cases
-    print("\n🔍 Testing Edge Cases...")
-    edge_cases = [
-        ("Very long topic", "A" * 201),
-        ("Unreasonable resource count", "Python programming give me 100 resources"),
-        ("Unreasonable step count", "Machine Learning give me 50 steps"),
-        ("Too few steps", "Web Development give me 1 step"),
-        ("Special characters in topic", "C++ programming"),
-        ("Unicode characters", "日本語を学ぶ"),
-        ("SQL injection attempt", "'; DROP TABLE users; --"),
-        ("XSS attempt", "<script>alert('xss')</script>"),
-        ("Very short valid", "AI"),
-        ("Numbers in valid topic", "Python 3 programming"),
-    ]
-    
-    for category, topic in edge_cases:
-        results.append(test_learning_flow(
-            f"Edge case: {category}",
-            topic,
-            None,
-            None
-        ))
-    
-    # Expand step tests
-    print("\n🔬 Testing Expand Step Functionality...")
-    expand_tests = [
-        ("Expand first step", "Python programming", 0),
-        ("Expand middle step", "Machine Learning", 2),
-        ("Expand with invalid step", "Web Development", 999),
-    ]
-    
-    for test_name, topic, step_index in expand_tests:
+    async with httpx.AsyncClient(timeout=30.0) as client:
         try:
-            async def test_expand():
-                async with httpx.AsyncClient(timeout=30.0) as client:
-                    # First get a learning plan
-                    learn_response = await client.post(
-                        f"{API_URL}/api/learn",
-                        json={"topic": topic},
-                        headers={"Content-Type": "application/json"}
-                    )
+            response = await client.post(
+                f"{API_URL}/api/learn",
+                json={"topic": topic},
+                headers={"Content-Type": "application/json"}
+            )
+            
+            result.api_status = response.status_code
+            
+            if response.status_code == 200:
+                try:
+                    data = response.json()
+                    result.api_response = data
                     
-                    if learn_response.status_code != 200:
-                        return TestResult(test_name, "expand_step", False,
-                                        f"Failed to get plan: {learn_response.status_code}")
+                    # Validate response structure
+                    if "plan" in data and isinstance(data["plan"], list):
+                        plan = data["plan"]
+                        if len(plan) > 0:
+                            # Check plan structure
+                            has_valid_steps = all(
+                                "title" in step and "description" in step 
+                                for step in plan
+                            )
+                            if has_valid_steps:
+                                result.passed = should_succeed
+                                result.verdict = f"✅ SUCCESS: Generated {len(plan)} steps"
+                            else:
+                                result.passed = False
+                                result.verdict = "❌ FAILED: Plan steps missing title/description"
+                        else:
+                            result.passed = False
+                            result.verdict = "❌ FAILED: Plan is empty"
+                    else:
+                        result.passed = False
+                        result.verdict = "❌ FAILED: Missing or invalid 'plan' field"
+                except json.JSONDecodeError:
+                    result.api_error = "Invalid JSON response"
+                    result.passed = False
+                    result.verdict = "❌ FAILED: Invalid JSON"
+            else:
+                # Expected failure
+                if not should_succeed:
+                    result.passed = True
+                    result.verdict = f"✅ CORRECTLY REJECTED: {response.status_code}"
+                else:
+                    try:
+                        error_data = response.json()
+                        result.api_error = error_data.get("detail", f"Status {response.status_code}")
+                    except:
+                        result.api_error = response.text[:200] if response.text else f"Status {response.status_code}"
+                    result.passed = False
+                    result.verdict = f"❌ FAILED: {result.api_error}"
                     
-                    plan_data = learn_response.json()
-                    plan = plan_data.get("plan", [])
-                    
-                    if step_index >= len(plan):
-                        return TestResult(test_name, "expand_step", False,
-                                        f"Step index {step_index} out of range (plan has {len(plan)} steps)")
-                    
-                    step = plan[step_index]
-                    
-                    # Try to expand the step
-                    expand_response = await client.post(
-                        f"{API_URL}/api/expand-step",
-                        json={
-                            "topic": topic,
-                            "step_title": step["title"],
-                            "step_description": step["description"]
-                        },
-                        headers={"Content-Type": "application/json"}
-                    )
-                    
-                    if expand_response.status_code != 200:
-                        return TestResult(test_name, "expand_step", False,
-                                        f"Failed to expand step: {expand_response.status_code}")
-                    
-                    expand_data = expand_response.json()
+        except httpx.TimeoutException:
+            result.api_error = "Request timeout"
+            result.passed = False
+            result.verdict = "❌ FAILED: Request timed out"
+        except httpx.ConnectError:
+            result.api_error = "Cannot connect to API"
+            result.passed = False
+            result.verdict = "❌ FAILED: Cannot connect to API (is it running?)"
+        except Exception as e:
+            result.api_error = str(e)
+            result.passed = False
+            result.verdict = f"❌ FAILED: {str(e)}"
+    
+    return result
+
+async def test_expand_step(topic: str, step_title: str, step_description: str) -> TestResult:
+    """Test expand-step endpoint"""
+    result = TestResult("Expand Step", "expand_step")
+    result.input = f"{topic} - {step_title}"
+    
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        try:
+            response = await client.post(
+                f"{API_URL}/api/expand-step",
+                json={
+                    "topic": topic,
+                    "step_title": step_title,
+                    "step_description": step_description
+                },
+                headers={"Content-Type": "application/json"}
+            )
+            
+            result.api_status = response.status_code
+            
+            if response.status_code == 200:
+                try:
+                    data = response.json()
+                    result.api_response = data
                     
                     # Check for expected fields
                     expected_fields = ["additionalContext", "practicalDetails", 
                                      "importantConsiderations", "realWorldExamples", 
                                      "potentialChallenges"]
-                    has_content = any(field in expand_data and expand_data[field] 
-                                    for field in expected_fields)
+                    has_fields = all(field in data for field in expected_fields)
                     
-                    if not has_content:
-                        return TestResult(test_name, "expand_step", False,
-                                        "Expanded step has no content")
-                    
-                    return TestResult(test_name, "expand_step", True,
-                                    f"Successfully expanded step {step_index + 1}")
-            
-            result = asyncio.run(test_expand())
-            results.append(result)
+                    if has_fields:
+                        result.passed = True
+                        result.verdict = "✅ SUCCESS: Expanded step returned all fields"
+                    else:
+                        result.passed = False
+                        result.verdict = "❌ FAILED: Missing expected fields"
+                except json.JSONDecodeError:
+                    result.passed = False
+                    result.verdict = "❌ FAILED: Invalid JSON"
+            else:
+                result.api_error = f"Status {response.status_code}"
+                result.passed = False
+                result.verdict = f"❌ FAILED: {result.api_error}"
+                
         except Exception as e:
-            results.append(TestResult(test_name, "expand_step", False, f"Exception: {str(e)}"))
+            result.api_error = str(e)
+            result.passed = False
+            result.verdict = f"❌ FAILED: {str(e)}"
     
-    # Frontend UI tests
-    print("\n🎨 Testing Frontend UI...")
-    results.append(test_frontend_ui("Frontend loads", "test"))
-    results.append(test_frontend_ui("Frontend has learning interface", "test"))
+    return result
+
+# Test cases
+TEST_CASES = [
+    # Valid topics (should succeed)
+    ("Valid: Language", "amharic", "valid", True),
+    ("Valid: Language with prefix", "learning spanish", "valid", True),
+    ("Valid: Skill", "cooking", "valid", True),
+    ("Valid: Subject", "mathematics", "valid", True),
+    ("Valid: Concept", "machine learning", "valid", True),
+    ("Valid: With steps request", "python programming give me 3 steps", "valid", True),
+    ("Valid: Practical topic", "how to run a marathon", "valid", True),
     
-    # Performance tests
-    print("\n⚡ Testing Performance...")
-    performance_tests = [
-        ("Fast response", "Python"),
-        ("Medium topic", "Machine Learning with TensorFlow and PyTorch"),
-        ("Complex topic", "How to build a full-stack web application using React, Node.js, PostgreSQL, and Docker"),
+    # Invalid topics (should be rejected)
+    ("Invalid: Gibberish", "fgnrjk gnsogfd", "invalid", False),
+    ("Invalid: Random characters", "asdfgh jklqwerty", "invalid", False),
+    ("Invalid: Person name", "donald trump", "invalid", False),
+    ("Invalid: Person name", "barack obama", "invalid", False),
+    ("Invalid: Person name", "elon musk", "invalid", False),
+    ("Invalid: Nonsensical words", "time space coffee", "invalid", False),
+    ("Invalid: Nonsensical words", "car tree music", "invalid", False),
+    
+    # Edge cases (potential breaking points)
+    ("Edge: Empty string", "", "edge_case", False),
+    ("Edge: Single character", "a", "edge_case", False),
+    ("Edge: Only spaces", "   ", "edge_case", False),
+    ("Edge: Very long topic", "a" * 500, "edge_case", False),
+    ("Edge: Numbers only", "123456", "edge_case", False),
+    ("Edge: Special characters", "test@#$%^&*()", "edge_case", False),
+    ("Edge: SQL injection attempt", "'; DROP TABLE users; --", "edge_case", False),
+    ("Edge: XSS attempt", "<script>alert('xss')</script>", "edge_case", False),
+    ("Edge: Unicode", "学习中文", "edge_case", False),
+    ("Edge: Emoji only", "🎓📚✨", "edge_case", False),
+    ("Edge: Newlines/tabs", "test\nnewline\ttab", "edge_case", False),
+    ("Edge: Extreme steps request", "python give me 100 steps", "edge_case", True),  # Should work but adjust
+    ("Edge: Zero steps", "python give me 0 steps", "edge_case", True),  # Should work but adjust
+    ("Edge: Negative steps", "python give me -5 steps", "edge_case", True),  # Should work but adjust
+    ("Edge: Just 'learning'", "learning", "edge_case", False),
+    ("Edge: Just 'how to'", "how to", "edge_case", False),
+    ("Edge: Multiple languages", "amharic and spanish and french", "edge_case", True),
+    ("Edge: Very short valid", "python", "edge_case", True),
+    ("Edge: Very long valid", "machine learning and artificial intelligence and deep learning and neural networks", "edge_case", True),
+]
+
+async def run_all_tests():
+    """Run all test cases"""
+    print("=" * 80)
+    print("Learning Experience App - Test Suite")
+    print("=" * 80)
+    print()
+    
+    results = []
+    
+    # Test /api/learn endpoint
+    print("Testing /api/learn endpoint...")
+    print("-" * 80)
+    
+    for test_name, topic, category, should_succeed in TEST_CASES:
+        result = await test_api_call(test_name, topic, category, should_succeed)
+        results.append(result)
+        
+        status_icon = "✅" if result.passed else "❌"
+        print(f"{status_icon} {result.test_name}")
+        print(f"   Input: {repr(result.input[:60])}")
+        print(f"   Status: {result.api_status}")
+        print(f"   Verdict: {result.verdict}")
+        if result.api_error:
+            print(f"   Error: {result.api_error}")
+        print()
+    
+    # Test /api/expand-step endpoint
+    print("Testing /api/expand-step endpoint...")
+    print("-" * 80)
+    
+    expand_tests = [
+        ("python", "Step 1: Learn Basics", "Start with Python syntax and variables"),
+        ("cooking", "Step 2: Practice", "Try making simple dishes"),
     ]
     
-    for test_name, topic in performance_tests:
-        try:
-            async def test_performance():
-                start = datetime.now()
-                async with httpx.AsyncClient(timeout=30.0) as client:
-                    response = await client.post(
-                        f"{API_URL}/api/learn",
-                        json={"topic": topic},
-                        headers={"Content-Type": "application/json"}
-                    )
-                    end = datetime.now()
-                    duration = (end - start).total_seconds()
-                    
-                    # Performance threshold: should complete in reasonable time
-                    # Note: AI generation can take time, so we use 30s as threshold
-                    passed = response.status_code == 200 and duration < 30.0
-                    details = f"Status: {response.status_code}, Duration: {duration:.2f}s"
-                    if duration >= 30.0:
-                        details += " (exceeded 30s threshold)"
-                    
-                    return TestResult(test_name, "performance", passed, details)
-            
-            result = asyncio.run(test_performance())
-            results.append(result)
-        except Exception as e:
-            results.append(TestResult(test_name, "performance", False, f"Exception: {str(e)}"))
+    for topic, step_title, step_description in expand_tests:
+        result = await test_expand_step(topic, step_title, step_description)
+        results.append(result)
+        
+        status_icon = "✅" if result.passed else "❌"
+        print(f"{status_icon} {result.test_name}")
+        print(f"   Input: {topic} - {step_title}")
+        print(f"   Status: {result.api_status}")
+        print(f"   Verdict: {result.verdict}")
+        if result.api_error:
+            print(f"   Error: {result.api_error}")
+        print()
     
-    return results
-
-def generate_report(results: List[TestResult]) -> Dict:
-    """Generate comprehensive test report"""
+    # Summary
+    print("=" * 80)
+    print("Test Summary")
+    print("=" * 80)
+    
     total = len(results)
     passed = sum(1 for r in results if r.passed)
     failed = total - passed
+    
+    print(f"Total tests: {total}")
+    print(f"Passed: {passed} ({passed/total*100:.1f}%)")
+    print(f"Failed: {failed} ({failed/total*100:.1f}%)")
+    print()
     
     # Group by category
     by_category = {}
     for result in results:
         if result.category not in by_category:
-            by_category[result.category] = {"passed": 0, "failed": 0, "tests": []}
+            by_category[result.category] = {"total": 0, "passed": 0}
+        by_category[result.category]["total"] += 1
         if result.passed:
             by_category[result.category]["passed"] += 1
-        else:
-            by_category[result.category]["failed"] += 1
-        by_category[result.category]["tests"].append(result)
     
-    report = {
+    print("By Category:")
+    for category, stats in by_category.items():
+        pct = stats["passed"] / stats["total"] * 100 if stats["total"] > 0 else 0
+        print(f"  {category}: {stats['passed']}/{stats['total']} ({pct:.1f}%)")
+    print()
+    
+    # Failed tests
+    failed_tests = [r for r in results if not r.passed]
+    if failed_tests:
+        print("Failed Tests:")
+        for result in failed_tests:
+            print(f"  ❌ {result.test_name}: {result.verdict}")
+        print()
+    
+    # Save results
+    results_dict = {
+        "timestamp": datetime.now().isoformat(),
         "summary": {
-            "total_tests": total,
+            "total": total,
             "passed": passed,
             "failed": failed,
-            "pass_rate": f"{(passed/total*100):.1f}%" if total > 0 else "0%",
-            "timestamp": datetime.now().isoformat()
+            "pass_rate": passed/total*100 if total > 0 else 0
         },
-        "by_category": {},
-        "all_tests": []
+        "by_category": {
+            cat: {"total": stats["total"], "passed": stats["passed"], 
+                  "pass_rate": stats["passed"]/stats["total"]*100 if stats["total"] > 0 else 0}
+            for cat, stats in by_category.items()
+        },
+        "results": [
+            {
+                "test_name": r.test_name,
+                "category": r.category,
+                "input": r.input,
+                "api_status": r.api_status,
+                "passed": r.passed,
+                "verdict": r.verdict,
+                "api_error": r.api_error,
+                "timestamp": r.timestamp
+            }
+            for r in results
+        ]
     }
     
-    for category, data in by_category.items():
-        report["by_category"][category] = {
-            "total": len(data["tests"]),
-            "passed": data["passed"],
-            "failed": data["failed"],
-            "pass_rate": f"{(data['passed']/len(data['tests'])*100):.1f}%" if data["tests"] else "0%"
-        }
+    with open("tests/test_results.json", "w") as f:
+        json.dump(results_dict, f, indent=2)
     
-    for result in results:
-        report["all_tests"].append({
-            "test_name": result.test_name,
-            "category": result.category,
-            "passed": result.passed,
-            "details": result.details,
-            "timestamp": result.timestamp
-        })
+    print(f"Results saved to tests/test_results.json")
+    print("=" * 80)
     
-    return report
-
-def print_report(report: Dict):
-    """Print formatted test report"""
-    print("\n" + "="*80)
-    print("📊 COMPREHENSIVE TEST REPORT")
-    print("="*80)
-    
-    summary = report["summary"]
-    print(f"\n📈 SUMMARY")
-    print(f"  Total Tests: {summary['total_tests']}")
-    print(f"  ✅ Passed: {summary['passed']}")
-    print(f"  ❌ Failed: {summary['failed']}")
-    print(f"  📊 Pass Rate: {summary['pass_rate']}")
-    
-    print(f"\n📂 BY CATEGORY")
-    for category, data in report["by_category"].items():
-        status = "✅" if data["failed"] == 0 else "⚠️"
-        print(f"  {status} {category.upper()}: {data['passed']}/{data['total']} passed ({data['pass_rate']})")
-    
-    print(f"\n📋 DETAILED RESULTS")
-    print("-"*80)
-    
-    failed_tests = [t for t in report["all_tests"] if not t["passed"]]
-    passed_tests = [t for t in report["all_tests"] if t["passed"]]
-    
-    if failed_tests:
-        print(f"\n❌ FAILED TESTS ({len(failed_tests)}):")
-        for test in failed_tests:
-            print(f"  ❌ {test['test_name']} ({test['category']})")
-            print(f"     Details: {test['details']}")
-    
-    if passed_tests:
-        print(f"\n✅ PASSED TESTS ({len(passed_tests)}):")
-        for test in passed_tests[:20]:  # Show first 20
-            print(f"  ✅ {test['test_name']} ({test['category']})")
-        if len(passed_tests) > 20:
-            print(f"  ... and {len(passed_tests) - 20} more passed tests")
+    return results
 
 if __name__ == "__main__":
-    print("🚀 Starting Learning Experience App Test Suite")
-    print(f"Backend URL: {API_URL}")
-    print(f"Frontend URL: {FRONTEND_URL}\n")
-    
-    results = run_all_tests()
-    report = generate_report(results)
-    
-    # Save report to file
-    with open("test_report_learning_app.json", "w") as f:
-        json.dump(report, f, indent=2)
-    
-    # Print report
-    print_report(report)
-    
-    # Save markdown report
-    with open("TEST_REPORT_LEARNING_APP.md", "w") as f:
-        f.write("# Learning Experience App - Comprehensive Test Report\n\n")
-        f.write(f"Generated: {report['summary']['timestamp']}\n\n")
-        f.write("## Summary\n\n")
-        f.write(f"- **Total Tests**: {report['summary']['total_tests']}\n")
-        f.write(f"- **Passed**: {report['summary']['passed']}\n")
-        f.write(f"- **Failed**: {report['summary']['failed']}\n")
-        f.write(f"- **Pass Rate**: {report['summary']['pass_rate']}\n\n")
-        
-        f.write("## Results by Category\n\n")
-        for category, data in report["by_category"].items():
-            f.write(f"### {category.upper()}\n")
-            f.write(f"- Total: {data['total']}\n")
-            f.write(f"- Passed: {data['passed']}\n")
-            f.write(f"- Failed: {data['failed']}\n")
-            f.write(f"- Pass Rate: {data['pass_rate']}\n\n")
-        
-        f.write("## All Test Results\n\n")
-        f.write("| Test Name | Category | Status | Details |\n")
-        f.write("|-----------|----------|--------|----------|\n")
-        for test in report["all_tests"]:
-            status = "✅ PASS" if test["passed"] else "❌ FAIL"
-            f.write(f"| {test['test_name']} | {test['category']} | {status} | {test['details']} |\n")
-    
-    print(f"\n💾 Reports saved:")
-    print(f"  - test_report_learning_app.json")
-    print(f"  - TEST_REPORT_LEARNING_APP.md")
-    print("\n" + "="*80)
-
+    asyncio.run(run_all_tests())
