@@ -163,20 +163,46 @@ async def validate_url(resource: dict, topic: str) -> dict | None:
             if "text/html" in content_type:
                 # Only check content for HTML pages
                 try:
-                    # Get a sample of the page content (first 10KB is enough for AI to analyze)
+                    # Get a sample of the page content (use more for better detection)
                     content_sample = response.text[:10000]
                     
+                    # Detect if this is likely a video/media URL (no hardcoding, just pattern recognition)
+                    is_likely_video = any(pattern in url.lower() for pattern in ['/watch', '/v/', '/video/', '/embed/', 'youtu.be'])
+                    
                     # Use AI to determine if this page's primary resource is accessible and usable
-                    validation_prompt = f"""Analyze this webpage:
+                    if is_likely_video:
+                        validation_prompt = f"""Analyze this video page:
 
 URL: {url}
-Content sample: {content_sample[:5000]}
+Content sample: {content_sample[:8000]}
+
+Determine if the VIDEO is accessible and playable.
+
+CRITICAL for video pages:
+- A video page can have HTML content (navigation, headers, layout) but the VIDEO itself might be unavailable
+- Check if the VIDEO is playable, not just if the page HTML loads
+- If the page says the video is unavailable, removed, private, deleted, "not available anymore", or not accessible, respond "INVALID"
+- A page with navigation/headers but an unavailable video is INVALID
+- Only respond "VALID" if the video is actually accessible and playable
+- Be STRICT for video pages - if unsure, respond "INVALID"
+
+Respond with ONLY:
+- "VALID" if the video is accessible and playable
+- "INVALID" if the video is unavailable, removed, private, or not accessible
+
+Response:"""
+                        
+                        system_message = "Expert at analyzing video pages. Be STRICT - check if the actual video is playable, not just if the page HTML loads. A video page with navigation but an unavailable video is INVALID. If the video is unavailable, removed, private, or not accessible, it's INVALID. Only approve if the video is actually playable."
+                    else:
+                        validation_prompt = f"""Analyze this webpage:
+
+URL: {url}
+Content sample: {content_sample[:8000]}
 
 Determine if this page's PRIMARY RESOURCE is accessible and usable.
 
 CRITICAL DISTINCTION:
 - A page can have HTML content (navigation, headers, layout) but the PRIMARY RESOURCE might be unavailable
-- For video pages: Check if the VIDEO is playable, not just if the page HTML loads
 - For document pages: Check if the DOCUMENT is readable, not just if the page loads
 - For course pages: Check if the COURSE is accessible, not just if the page loads
 - For general pages: Check if the page content is actually usable
@@ -192,20 +218,26 @@ Respond with ONLY:
 - "INVALID" if the primary resource is unavailable, removed, private, or not accessible
 
 Response:"""
+                        
+                        system_message = "Expert at analyzing web pages. Understand the distinction between page HTML content and the actual resource availability. For media/document pages, check if the actual resource is accessible, not just if the page HTML loads. A page with navigation but an unavailable resource is invalid. For general pages, be lenient - approve when in doubt."
 
                     ai_result = call_ai(
                         validation_prompt,
-                        "Expert at analyzing web pages. Understand the distinction between page HTML content and the actual resource availability. For video/media/document pages, check if the actual resource is accessible, not just if the page HTML loads. A page with navigation but an unavailable resource is invalid. For general pages, be lenient - approve when in doubt.",
+                        system_message,
                         max_tokens=20,
                         temperature=0.1
                     )
                     ai_result_upper = ai_result.upper().strip()
                     
-                    # Check for explicit INVALID - be lenient otherwise
+                    # Check for explicit INVALID
                     if ai_result_upper.startswith("INVALID") and len(ai_result_upper) > 5:
                         # AI explicitly determined it's an error page
                         return None
-                    # If response is unclear, include it anyway (lenient mode)
+                    # For video pages, be strict - if response is unclear or not explicitly VALID, reject
+                    if is_likely_video and not ai_result_upper.startswith("VALID"):
+                        # Video page validation unclear or invalid - reject to be safe
+                        return None
+                    # For other pages, if response is unclear, include it anyway (lenient mode)
                 except Exception:
                     # If AI check fails, but status is good, include it (better to show than block)
                     pass
