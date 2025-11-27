@@ -262,7 +262,7 @@ Response:"""
         # Other unexpected errors - can't verify, skip it
         return None
 
-async def generate_plan_and_resources(topic: str, num_steps: int = None, num_examples: int = 5) -> tuple[List[Dict[str, str]], List[Dict[str, str]]]:
+async def generate_plan_and_resources(topic: str, num_steps: int = None, num_examples: int = 3) -> tuple[List[Dict[str, str]], List[Dict[str, str]]]:
     """
     OPTIMIZED: Combined function that generates both learning plan and resources in a single AI call.
     This reduces latency and cost by 50% compared to separate calls.
