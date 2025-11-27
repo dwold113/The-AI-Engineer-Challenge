@@ -180,9 +180,52 @@ async def validate_url(resource: dict, topic: str) -> dict | None:
                             "video has been removed",
                             "private video",
                             "video has been removed by the user",
+                            "this video has been removed by the user",
+                            "video no longer available",
+                            "this video is no longer available",
+                            "unavailable",
                         ]
                         if any(pattern in content_lower for pattern in youtube_error_patterns):
                             # YouTube video is explicitly unavailable - reject immediately
+                            return None
+                        
+                        # Check if page content is suspiciously minimal (just footer/navigation = unavailable video)
+                        # YouTube pages with available videos have substantial content (player, description, comments, etc.)
+                        # Pages with only footer/navigation suggest the video is unavailable
+                        # Normalize content for checking (remove spaces/newlines for pattern matching)
+                        normalized_content = content_lower.replace(" ", "").replace("\n", "").replace("\t", "")
+                        
+                        minimal_content_indicators = [
+                            "aboutpresscopyrightcontactuscreatorsadvertise",
+                            "howyoutubeworkstestnewfeatures",
+                            "©2025googlellc",
+                            "nflsundayticket",
+                            "aboutpresscopyright",
+                        ]
+                        has_minimal_content = any(indicator in normalized_content for indicator in minimal_content_indicators)
+                        
+                        # If page only has footer/navigation and no video-related content, it's likely unavailable
+                        video_content_indicators = [
+                            "watch-player",
+                            "ytd-player",
+                            "video-player",
+                            "watch-content",
+                            "primary-inner",
+                            "ytd-watch-metadata",
+                            "ytd-watch-flexy",
+                            "watch-main-col",
+                        ]
+                        has_video_content = any(indicator in content_lower for indicator in video_content_indicators)
+                        
+                        # If we see minimal footer content but no video player/content, reject it
+                        # Also check if content is suspiciously small (unavailable videos often have minimal HTML)
+                        if has_minimal_content and not has_video_content:
+                            # Page only has footer - video is unavailable
+                            return None
+                        
+                        # Additional check: if content is very small and doesn't have video indicators, likely unavailable
+                        if len(content_sample) < 30000 and not has_video_content:
+                            # Very small page without video content - likely unavailable
                             return None
                     
                     # Use AI to determine if this page's primary resource is accessible and usable
