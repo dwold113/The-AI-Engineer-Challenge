@@ -158,52 +158,44 @@ async def validate_url(resource: dict, topic: str) -> dict | None:
                 # 4xx or 5xx - URL is broken, reject it
                 return None
             
-            # Second check: Verify page content is not an error page (only for HTML pages)
+            # Second check: Use AI to verify page content is not an error page (only for HTML pages)
             content_type = response.headers.get("content-type", "").lower()
             if "text/html" in content_type:
                 # Only check content for HTML pages
                 try:
-                    content = response.text[:50000].lower()
+                    # Get a sample of the page content (first 10KB is enough for AI to analyze)
+                    content_sample = response.text[:10000]
                     
-                    # Check for error indicators that suggest the page/content is broken
-                    # YouTube-specific errors
-                    youtube_errors = [
-                        "video unavailable",
-                        "this video is not available",
-                        "video is unavailable",
-                        "this video has been removed",
-                        "private video",
-                        "video has been removed by the user",
-                    ]
+                    # Use AI to determine if this is an error page or has actual content
+                    validation_prompt = f"""Analyze this webpage content snippet:
+
+URL: {url}
+Content sample: {content_sample[:5000]}
+
+Determine if this page:
+1. Is an error page (404, video unavailable, content removed, etc.)
+2. Has actual useful content that a user can access
+
+Respond with ONLY:
+- "VALID" if the page has actual content and is accessible
+- "INVALID" if it's an error page, content unavailable, or broken
+
+Response:"""
+
+                    ai_result = call_ai(
+                        validation_prompt,
+                        "Expert at analyzing web pages. Determine if a page is an error page or has actual accessible content. Be strict - only approve pages with real content.",
+                        max_tokens=20,
+                        temperature=0.1
+                    ).upper().strip()
                     
-                    # General error indicators
-                    general_errors = [
-                        "error 404",
-                        "page not found",
-                        "this content is not available",
-                        "content unavailable",
-                        "access denied",
-                        "this page doesn't exist",
-                        "sorry, we couldn't find that page",
-                        "the page you're looking for doesn't exist",
-                    ]
-                    
-                    # Check for YouTube errors (more strict - any match is bad)
-                    if "youtube.com" in url.lower() or "youtu.be" in url.lower():
-                        if any(error in content for error in youtube_errors):
-                            # YouTube video is unavailable
-                            return None
-                    
-                    # Check for general errors (must be short page to avoid false positives)
-                    has_general_error = any(error in content for error in general_errors)
-                    is_short_error_page = len(response.text) < 500 and has_general_error
-                    
-                    if is_short_error_page:
-                        # This looks like an error page
+                    if not ai_result.startswith("VALID"):
+                        # AI determined it's an error page or invalid
                         return None
                     
-                except Exception:
-                    # If we can't parse content, but status is good, include it
+                except Exception as e:
+                    # If AI check fails, but status is good, include it (better to show than block)
+                    print(f"Error in AI content validation for {url}: {e}")
                     pass
             # For non-HTML content (PDFs, JSON, etc.) or if content check passes, include it
             
