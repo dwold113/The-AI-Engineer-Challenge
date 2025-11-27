@@ -768,20 +768,32 @@ async def expand_learning_step(topic: str, step_title: str, step_description: st
         prompt = f"""Topic: {topic}
 Step: {step_title} - {step_description}
 
-Complementary details. JSON:
+Generate SPECIFIC, UNIQUE details for THIS PARTICULAR STEP. Do NOT provide generic advice that could apply to any step.
+
+Focus on:
+- What makes THIS step unique compared to other steps in learning {topic}
+- Step-specific techniques, methods, or approaches
+- Concrete examples relevant to THIS step
+- Challenges that are PARTICULAR to THIS step
+- Practical details that help with THIS specific step
+
+The content must be tailored to "{step_title}" and "{step_description}" - not generic learning advice.
+
+JSON format:
 {{
-  "additionalContext": "Brief context...",
-  "practicalDetails": ["Detail 1", "Detail 2"],
-  "importantConsiderations": ["Consideration 1"],
-  "realWorldExamples": ["Example 1"],
-  "potentialChallenges": ["Challenge 1: Solution description", "Challenge 2: Solution description"]
+  "additionalContext": "Step-specific context about why this step matters and how it fits into learning {topic}",
+  "practicalDetails": ["Specific actionable detail for THIS step", "Another specific detail for THIS step"],
+  "importantConsiderations": ["Consideration specific to THIS step"],
+  "realWorldExamples": ["Example specific to THIS step"],
+  "potentialChallenges": ["Challenge specific to THIS step: Solution for THIS step", "Another challenge for THIS step: Solution"]
 }}
 
-IMPORTANT: All fields must be arrays of STRINGS only. potentialChallenges should be strings like "Challenge: Solution", not objects.
+CRITICAL: All content must be SPECIFIC to "{step_title}" - {step_description}. Do NOT repeat generic learning advice.
+All fields must be arrays of STRINGS only. potentialChallenges should be strings like "Challenge: Solution", not objects.
 
 JSON only:"""
 
-        result = call_ai(prompt, "Expert educator. JSON only.", max_tokens=350, temperature=0.5)
+        result = call_ai(prompt, "Expert educator who provides step-specific, tailored guidance. Generate unique content for each step that directly relates to the step title and description. Avoid generic advice.", max_tokens=400, temperature=0.6)
         expanded = parse_json_response(result)
         
         # Ensure all array fields are arrays of strings (not objects)
