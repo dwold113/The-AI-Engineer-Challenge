@@ -228,13 +228,18 @@ Response:"""
                     print(f"[VALIDATE] AI raw response: '{ai_result}'")
                     print(f"[VALIDATE] AI normalized response: '{ai_result_upper}'")
                     
-                    if not ai_result_upper.startswith("VALID"):
-                        # AI determined it's an error page or invalid
-                        print(f"[VALIDATE] ❌ REJECTED {title}: AI determined page is invalid/error page")
+                    # Check for explicit INVALID - be lenient otherwise
+                    if ai_result_upper.startswith("INVALID") and len(ai_result_upper) > 5:
+                        # AI explicitly determined it's an error page
+                        print(f"[VALIDATE] ❌ REJECTED {title}: AI explicitly determined page is invalid/error page")
                         print(f"[VALIDATE] AI reasoning: {ai_result}")
                         return None
-                    
-                    print(f"[VALIDATE] ✓ AI validation passed - page has valid content")
+                    elif not ai_result_upper.startswith("VALID"):
+                        # AI response is unclear or unexpected - be lenient and include it
+                        print(f"[VALIDATE] ⚠️  WARNING: AI response unclear ('{ai_result_upper}'), but including URL anyway (lenient mode)")
+                        print(f"[VALIDATE] AI raw response was: '{ai_result}'")
+                    else:
+                        print(f"[VALIDATE] ✓ AI validation passed - page has valid content")
                     
                 except Exception as e:
                     # If AI check fails, but status is good, include it (better to show than block)
