@@ -9,15 +9,8 @@ interface LearningStep {
   description: string
 }
 
-interface Example {
-  title: string
-  url: string
-  description: string
-}
-
 interface LearningResponse {
   plan: LearningStep[]
-  examples: Example[]
   message?: string
 }
 
@@ -169,7 +162,7 @@ export default function Home() {
             <div className="h-1 w-24 bg-gradient-to-r from-purple-500 to-blue-500 mx-auto rounded-full"></div>
           </div>
           <p className="text-xl md:text-2xl text-gray-300 font-light max-w-2xl mx-auto leading-relaxed">
-            Ask to learn about anything, and we'll create a personalized plan with real examples!
+            Ask to learn about anything, and we'll create a personalized learning plan!
           </p>
         </div>
 
@@ -368,50 +361,16 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Real Examples */}
-            <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-8 md:p-10 shadow-2xl border border-white/10 hover:border-white/20 transition-all duration-300">
-              <div className="flex items-center gap-3 mb-8">
-                <div className="w-1 h-12 bg-gradient-to-b from-blue-500 to-cyan-500 rounded-full"></div>
-                <h2 className="text-4xl font-bold bg-gradient-to-r from-blue-300 to-cyan-300 bg-clip-text text-transparent">
-                  Real Examples & Resources
-                </h2>
-              </div>
-              {learningData.message && (
-                <div className="mb-6 bg-blue-500/20 backdrop-blur-sm border-2 border-blue-500/50 text-blue-100 px-5 py-4 rounded-xl animate-fade-in shadow-lg">
+            {learningData.message && (
+              <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-8 md:p-10 shadow-2xl border border-white/10">
+                <div className="bg-blue-500/20 backdrop-blur-sm border-2 border-blue-500/50 text-blue-100 px-5 py-4 rounded-xl animate-fade-in shadow-lg">
                   <div className="flex items-center gap-2">
                     <span className="text-xl">ℹ️</span>
                     <span className="font-medium">{learningData.message}</span>
                   </div>
                 </div>
-              )}
-              <div className="grid gap-5 md:grid-cols-2">
-                {learningData.examples.map((example, index) => (
-                  <a
-                    key={index}
-                    href={example.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block bg-gradient-to-br from-white/5 to-white/0 rounded-xl p-6 border border-white/10 hover:border-blue-400/50 hover:bg-white/10 transition-all duration-300 group hover:shadow-xl hover:shadow-blue-500/10 animate-slide-in hover:scale-[1.02]"
-                    style={{ animationDelay: `${index * 100}ms` }}
-                  >
-                    <div className="flex items-start gap-3 mb-3">
-                      <span className="text-2xl">🔗</span>
-                      <h3 className="text-lg font-bold text-purple-200 group-hover:text-purple-100 transition-colors line-clamp-2">
-                        {example.title}
-                      </h3>
-                    </div>
-                    <p className="text-sm text-gray-400 mb-3 line-clamp-2">{example.description}</p>
-                    <p className="text-xs text-blue-400 truncate font-mono group-hover:text-blue-300 transition-colors">
-                      {example.url}
-                    </p>
-                    <div className="mt-4 flex items-center gap-2 text-blue-400 text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-                      <span>Visit resource</span>
-                      <span className="transform group-hover:translate-x-1 transition-transform">→</span>
-                    </div>
-                  </a>
-                ))}
               </div>
-            </div>
+            )}
           </div>
         )}
       </main>
