@@ -384,15 +384,16 @@ JSON only:"""
         if len(examples) == 0:
             try:
                 # Use AI to suggest fallback educational resources
-                fallback_prompt = f"""Suggest 3 general educational resources for learning about: {topic}
+                fallback_prompt = f"""Suggest {num_examples} general educational resources for learning about: {topic}
 
-Provide real educational websites, documentation, or learning platforms.
+Provide real educational websites, documentation, tutorials, or courses. Use well-known platforms like:
+- Khan Academy, Coursera, edX, YouTube, Wikipedia, GitHub, MDN Web Docs, etc.
 
 JSON: [{{"title": "Resource Name", "url": "https://real-site.com", "description": "Brief"}}, ...]
 
 JSON only:"""
                 
-                fallback_result = call_ai(fallback_prompt, "Expert at finding educational resources. Provide URLs from well-known educational platforms with standard URLs.", max_tokens=200, temperature=0.5)
+                fallback_result = call_ai(fallback_prompt, "Expert at finding educational resources. Provide URLs from well-known educational platforms with standard URLs.", max_tokens=300, temperature=0.5)
                 fallback_resources = parse_json_response(fallback_result)
                 
                 # Validate fallback URLs in parallel
@@ -402,6 +403,16 @@ JSON only:"""
                 for result in fallback_results:
                     if result and isinstance(result, dict):
                         examples.append(result)
+                
+                # If still no resources after validation, include them anyway (better to show than nothing)
+                if len(examples) == 0 and fallback_resources:
+                    for resource in fallback_resources[:num_examples]:
+                        if resource.get("url") and resource.get("url").startswith("http"):
+                            examples.append({
+                                "title": resource.get("title", f"{topic} Resource"),
+                                "url": resource.get("url"),
+                                "description": resource.get("description", f"Learn about {topic}")
+                            })
             except Exception:
                 pass
         
