@@ -166,27 +166,36 @@ async def validate_url(resource: dict, topic: str) -> dict | None:
                     # Get a sample of the page content (first 10KB is enough for AI to analyze)
                     content_sample = response.text[:10000]
                     
-                    # Use AI to determine if this is an error page or has actual content
-                    validation_prompt = f"""Analyze this webpage content snippet:
+                    # Use AI to determine if this page's primary resource is accessible and usable
+                    validation_prompt = f"""Analyze this webpage:
 
 URL: {url}
 Content sample: {content_sample[:5000]}
 
-Determine if this page is an ERROR PAGE (like 404, video unavailable, content removed, access denied).
+Determine if this page's PRIMARY RESOURCE is accessible and usable.
+
+CRITICAL DISTINCTION:
+- A page can have HTML content (navigation, headers, layout) but the PRIMARY RESOURCE might be unavailable
+- For video pages: Check if the VIDEO is playable, not just if the page HTML loads
+- For document pages: Check if the DOCUMENT is readable, not just if the page loads
+- For course pages: Check if the COURSE is accessible, not just if the page loads
+- For general pages: Check if the page content is actually usable
 
 IMPORTANT:
-- Only respond "INVALID" if it's clearly an ERROR PAGE
-- Be lenient - when in doubt, choose "VALID"
+- If the page says the primary resource is unavailable, removed, private, deleted, or not accessible, respond "INVALID"
+- A page with navigation/headers but an unavailable primary resource is INVALID
+- Only respond "VALID" if the primary resource is actually accessible and usable
+- Be lenient for general content pages - when in doubt, choose "VALID"
 
 Respond with ONLY:
-- "VALID" if the page has any actual content (even if minimal)
-- "INVALID" ONLY if it's clearly an ERROR PAGE with no useful content
+- "VALID" if the primary resource is accessible and usable
+- "INVALID" if the primary resource is unavailable, removed, private, or not accessible
 
 Response:"""
 
                     ai_result = call_ai(
                         validation_prompt,
-                        "Expert at analyzing web pages. You are LENIENT - only reject pages that are clearly error pages with no content. Approve any page with actual content, even if minimal. When in doubt, approve the page.",
+                        "Expert at analyzing web pages. Understand the distinction between page HTML content and the actual resource availability. For video/media/document pages, check if the actual resource is accessible, not just if the page HTML loads. A page with navigation but an unavailable resource is invalid. For general pages, be lenient - approve when in doubt.",
                         max_tokens=20,
                         temperature=0.1
                     )
