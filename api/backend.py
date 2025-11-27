@@ -401,6 +401,7 @@ JSON only:"""
         
         # Final fallback if we still don't have enough - use AI to generate fallback resources
         if len(examples) == 0:
+            print(f"[RESOURCES] No valid resources found, trying fallback generation...")
             try:
                 # Use AI to suggest fallback educational resources
                 fallback_prompt = f"""Suggest 3 general educational resources for learning about: {topic}
@@ -414,15 +415,29 @@ JSON only:"""
                 fallback_result = call_ai(fallback_prompt, "Expert at finding educational resources. Provide URLs from well-known educational platforms with standard URLs.", max_tokens=200, temperature=0.5)
                 fallback_resources = parse_json_response(fallback_result)
                 
+                print(f"[RESOURCES] Fallback AI generated {len(fallback_resources)} resources")
+                for i, res in enumerate(fallback_resources, 1):
+                    print(f"[RESOURCES] Fallback {i}. {res.get('title', 'No title')} - {res.get('url', 'No URL')}")
+                
                 # Validate fallback URLs in parallel
+                print(f"[RESOURCES] Starting fallback validation of {len(fallback_resources)} URLs...")
                 fallback_validation_tasks = [validate_url(resource, topic) for resource in fallback_resources]
                 fallback_results = await asyncio.gather(*fallback_validation_tasks, return_exceptions=True)
                 
-                for result in fallback_results:
-                    if result and isinstance(result, dict):
+                for i, result in enumerate(fallback_results, 1):
+                    if isinstance(result, Exception):
+                        print(f"[RESOURCES] Fallback validation task {i} raised exception: {type(result).__name__}: {result}")
+                    elif result and isinstance(result, dict):
                         examples.append(result)
+                        print(f"[RESOURCES] Added fallback resource {i}: {result.get('title', 'Unknown')}")
+                    else:
+                        print(f"[RESOURCES] Fallback validation task {i} returned None (rejected)")
+                
+                print(f"[RESOURCES] After fallback validation: {len(examples)} valid resources")
             except Exception as e:
-                print(f"Error generating fallback resources: {e}")
+                print(f"[RESOURCES] Error generating fallback resources: {type(e).__name__}: {e}")
+                import traceback
+                print(f"[RESOURCES] Traceback: {traceback.format_exc()}")
         
         return plan, examples[:num_examples]
 
