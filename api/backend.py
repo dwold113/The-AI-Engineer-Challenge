@@ -261,19 +261,24 @@ async def generate_plan_and_resources(topic: str, num_steps: int = None, num_exa
 
 Generate both:
 1. A structured learning plan: {step_instruction}
-2. {num_examples} real learning resources (actual educational websites, documentation, tutorials, or courses with REAL, VERIFIED URLs that actually exist)
+2. {num_examples} diverse learning resources from DIFFERENT platforms (mix of videos, articles, courses, documentation)
 
-CRITICAL: Only provide URLs that you KNOW exist and are accessible. Do NOT make up URLs or guess URL structures. Only use well-known educational platforms with standard URLs:
-- Khan Academy: https://www.khanacademy.org/...
-- Coursera: https://www.coursera.org/...
-- edX: https://www.edx.org/...
-- YouTube: https://www.youtube.com/watch?v=...
-- GitHub: https://github.com/...
-- MDN Web Docs: https://developer.mozilla.org/...
-- Wikipedia: https://en.wikipedia.org/wiki/...
-- GeeksforGeeks: https://www.geeksforgeeks.org/...
+IMPORTANT - DIVERSITY REQUIRED:
+- Include a VARIETY of resource types: YouTube videos, articles, courses, documentation, tutorials
+- Use DIFFERENT platforms - don't repeat the same platform multiple times
+- Include YouTube videos when relevant (they're great for learning!)
+- Mix of formats: videos, written guides, interactive courses, documentation
 
-If you're not certain a URL exists, DO NOT include it. Only provide URLs you can verify.
+Platforms to consider (use variety, not just one):
+- YouTube: https://www.youtube.com/watch?v=... (include relevant videos!)
+- Khan Academy, Coursera, edX (courses)
+- Wikipedia, Medium, personal blogs (articles)
+- GitHub (code examples, projects)
+- MDN Web Docs, official documentation sites
+- Reddit, forums (community discussions)
+- Other educational sites specific to the topic
+
+CRITICAL: Only provide URLs that you KNOW exist and are accessible. Do NOT make up URLs or guess URL structures.
 
 Respond in JSON format:
 {{
@@ -285,9 +290,9 @@ JSON only:"""
 
         result = call_ai(
             combined_prompt,
-            "Expert educator and resource finder. Generate learning plans and find REAL educational resources. CRITICAL: Only provide URLs that you KNOW exist and are accessible. Do NOT make up URLs, guess URL structures, or include URLs you cannot verify. Only use well-known educational platforms with standard, verifiable URLs. If uncertain about a URL, do not include it.",
+            "Expert educator and resource finder. Generate diverse learning resources from different platforms. Include a mix of YouTube videos, articles, courses, and documentation. Prioritize variety - use different platforms and resource types. Only provide URLs that you KNOW exist and are accessible. Do NOT make up URLs or guess URL structures.",
             max_tokens=800,
-            temperature=0.5
+            temperature=0.7
         )
         data = parse_json_response(result)
         
@@ -384,16 +389,22 @@ JSON only:"""
         if len(examples) == 0:
             try:
                 # Use AI to suggest fallback educational resources
-                fallback_prompt = f"""Suggest {num_examples} general educational resources for learning about: {topic}
+                fallback_prompt = f"""Suggest {num_examples} diverse educational resources for learning about: {topic}
 
-Provide real educational websites, documentation, tutorials, or courses. Use well-known platforms like:
-- Khan Academy, Coursera, edX, YouTube, Wikipedia, GitHub, MDN Web Docs, etc.
+Provide a VARIETY of resources from DIFFERENT platforms:
+- YouTube videos (include relevant videos!)
+- Articles (Wikipedia, Medium, blogs)
+- Courses (Coursera, edX, Khan Academy)
+- Documentation (official docs, MDN, etc.)
+- Community resources (Reddit, forums)
+
+Use DIFFERENT platforms - don't repeat the same one.
 
 JSON: [{{"title": "Resource Name", "url": "https://real-site.com", "description": "Brief"}}, ...]
 
 JSON only:"""
                 
-                fallback_result = call_ai(fallback_prompt, "Expert at finding educational resources. Provide URLs from well-known educational platforms with standard URLs.", max_tokens=300, temperature=0.5)
+                fallback_result = call_ai(fallback_prompt, "Expert at finding diverse educational resources. Include a mix of YouTube videos, articles, courses, and documentation from different platforms. Prioritize variety.", max_tokens=300, temperature=0.7)
                 fallback_resources = parse_json_response(fallback_result)
                 
                 # Validate fallback URLs in parallel
