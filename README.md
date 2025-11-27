@@ -79,7 +79,7 @@ Got everything in place? Let's move on!
      cursor .
      ```
 
-4. Check out the existing backend code found in `/api/index.py`
+4. Check out the existing backend code found in `/api/backend.py`
 
 </details>
 
