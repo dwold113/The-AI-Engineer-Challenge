@@ -2,7 +2,25 @@
 
 import { useState, useEffect } from 'react'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+// Use relative URL for production (same domain), or env var for custom backend
+// Never use localhost in production to avoid browser local network permission prompts
+// Check at runtime to avoid SSR issues
+const getApiUrl = () => {
+  // If env var is explicitly set, use it
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL
+  }
+  // In browser, check if we're on localhost
+  if (typeof window !== 'undefined') {
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      return 'http://localhost:8000' // Local development
+    }
+    // Production (Vercel) - use relative URL to avoid local network permission prompts
+    return ''
+  }
+  // SSR fallback - default to relative URL (safe for production)
+  return ''
+}
 
 interface LearningStep {
   title: string
@@ -52,7 +70,8 @@ export default function Home() {
     setExpandedSteps({}) // Clear expanded steps when starting a new search
 
     try {
-      const response = await fetch(`${API_URL}/api/learn`, {
+      const apiUrl = getApiUrl()
+      const response = await fetch(`${apiUrl}/api/learn`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -113,7 +132,8 @@ export default function Home() {
     setExpandingStep(index)
 
     try {
-      const response = await fetch(`${API_URL}/api/expand-step`, {
+      const apiUrl = getApiUrl()
+      const response = await fetch(`${apiUrl}/api/expand-step`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
