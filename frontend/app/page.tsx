@@ -466,7 +466,7 @@ export default function Home() {
           <h1 className="glitch-text text-center text-3xl font-bold text-cyan-400">
             &gt; NEXUS_AI.exe
           </h1>
-          <p className="text-center text-sm text-cyan-300">Personal Assistant from the Future</p>
+          <p className="text-center text-sm text-cyan-300">Personal Assistant from Space 🚀</p>
         </header>
 
         {/* Messages Area */}
