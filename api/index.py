@@ -3,7 +3,26 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from openai import OpenAI
 import os
-from dotenv import load_dotenv
+import sys
+import json
+# #region agent log
+try:
+    with open('/Users/dannywold/ai/The-AI-Engineer-Challenge/.cursor/debug.log', 'a') as f:
+        f.write(json.dumps({"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"A","location":"api/index.py:6","message":"Before dotenv import - checking Python path","data":{"pythonPath":sys.path[:3],"pythonVersion":sys.version},"timestamp":int(__import__('time').time()*1000)}) + '\n')
+except: pass
+# #endregion
+try:
+    from dotenv import load_dotenv
+    # #region agent log
+    with open('/Users/dannywold/ai/The-AI-Engineer-Challenge/.cursor/debug.log', 'a') as f:
+        f.write(json.dumps({"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"A","location":"api/index.py:10","message":"dotenv import successful","data":{},"timestamp":int(__import__('time').time()*1000)}) + '\n')
+    # #endregion
+except ImportError as e:
+    # #region agent log
+    with open('/Users/dannywold/ai/The-AI-Engineer-Challenge/.cursor/debug.log', 'a') as f:
+        f.write(json.dumps({"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"A","location":"api/index.py:13","message":"dotenv import failed","data":{"error":str(e),"errorType":type(e).__name__},"timestamp":int(__import__('time').time()*1000)}) + '\n')
+    # #endregion
+    raise
 
 load_dotenv()
 

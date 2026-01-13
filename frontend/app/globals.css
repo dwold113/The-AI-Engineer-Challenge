@@ -1,0 +1,431 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Courier New', monospace;
+  overflow: hidden;
+  height: 100vh;
+  width: 100vw;
+}
+
+/* Clear night sky background */
+.space-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: #0a0e27;
+  background-image: 
+    radial-gradient(2px 2px at 20% 30%, white, transparent),
+    radial-gradient(2px 2px at 60% 70%, white, transparent),
+    radial-gradient(1px 1px at 50% 50%, white, transparent),
+    radial-gradient(1px 1px at 80% 10%, white, transparent),
+    radial-gradient(2px 2px at 40% 80%, white, transparent);
+  background-size: 200% 200%;
+  z-index: 0;
+  overflow: hidden;
+}
+
+/* Stars twinkling - more realistic */
+@keyframes twinkle {
+  0%, 100% { 
+    opacity: 0.4;
+    transform: scale(1);
+  }
+  50% { 
+    opacity: 1;
+    transform: scale(1.2);
+  }
+}
+
+@keyframes twinkle-slow {
+  0%, 100% { 
+    opacity: 0.6;
+    transform: scale(1);
+  }
+  50% { 
+    opacity: 1;
+    transform: scale(1.1);
+  }
+}
+
+.star {
+  position: absolute;
+  background: white;
+  border-radius: 50%;
+  box-shadow: 0 0 2px white, 0 0 4px rgba(255, 255, 255, 0.5);
+}
+
+.star-small {
+  animation: twinkle 3s infinite;
+}
+
+.star-medium {
+  animation: twinkle 2s infinite;
+}
+
+.star-large {
+  animation: twinkle-slow 4s infinite;
+  box-shadow: 0 0 3px white, 0 0 6px rgba(255, 255, 255, 0.8), 0 0 10px rgba(255, 255, 255, 0.4);
+}
+
+/* Planet animations */
+@keyframes planet-rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes planet-pulse {
+  0%, 100% { 
+    transform: scale(1);
+    box-shadow: 0 0 20px rgba(100, 150, 255, 0.5);
+  }
+  50% { 
+    transform: scale(1.1);
+    box-shadow: 0 0 40px rgba(100, 150, 255, 0.8);
+  }
+}
+
+@keyframes planet-launch {
+  0% {
+    transform: translateY(100vh) scale(0.5);
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-100vh) scale(1.5);
+    opacity: 0;
+  }
+}
+
+.planet {
+  position: absolute;
+  border-radius: 50%;
+  animation: planet-rotate 20s linear infinite;
+}
+
+.planet-pulse {
+  animation: planet-pulse 2s ease-in-out infinite;
+}
+
+.planet-launch {
+  animation: planet-launch 3s ease-out forwards;
+}
+
+/* Orbital rings */
+@keyframes orbit {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.orbit-ring {
+  position: absolute;
+  border: 2px solid rgba(100, 150, 255, 0.3);
+  border-radius: 50%;
+  animation: orbit 15s linear infinite;
+}
+
+/* Glitch effect - space themed */
+@keyframes glitch {
+  0%, 100% {
+    text-shadow: 2px 0 #00ffff, -2px 0 #ff00ff;
+  }
+  25% {
+    text-shadow: -2px 0 #00ffff, 2px 0 #ff00ff;
+  }
+  50% {
+    text-shadow: 2px 0 #ff00ff, -2px 0 #00ffff;
+  }
+  75% {
+    text-shadow: -2px 0 #ff00ff, 2px 0 #00ffff;
+  }
+}
+
+.glitch-text {
+  animation: glitch 0.3s infinite;
+}
+
+/* Portal/Tunnel animation */
+@keyframes portal-travel {
+  0% {
+    transform: scale(1) translateZ(0);
+    opacity: 1;
+    filter: blur(0px);
+  }
+  30% {
+    transform: scale(0.5) translateZ(-300px);
+    opacity: 0.8;
+    filter: blur(2px);
+  }
+  60% {
+    transform: scale(0.2) translateZ(-600px);
+    opacity: 0.5;
+    filter: blur(5px);
+  }
+  100% {
+    transform: scale(0.1) translateZ(-1000px);
+    opacity: 0;
+    filter: blur(10px);
+  }
+}
+
+@keyframes portal-ring-rotate {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes portal-appear {
+  0% {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes portal-expand {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(8);
+    opacity: 0;
+  }
+}
+
+.portal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1000;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0.9) 100%);
+  backdrop-filter: blur(2px);
+}
+
+.portal-frame {
+  width: 400px;
+  height: 400px;
+  position: relative;
+  animation: portal-appear 0.8s ease-out forwards;
+}
+
+.portal-ring {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 8px solid transparent;
+  border-top: 8px solid rgba(100, 200, 255, 0.8);
+  border-right: 8px solid rgba(150, 100, 255, 0.6);
+  border-bottom: 8px solid rgba(100, 200, 255, 0.8);
+  border-left: 8px solid rgba(150, 100, 255, 0.6);
+  animation: portal-ring-rotate 3s linear infinite;
+  box-shadow: 
+    0 0 30px rgba(100, 200, 255, 0.6),
+    0 0 60px rgba(150, 100, 255, 0.4),
+    inset 0 0 30px rgba(100, 200, 255, 0.2);
+}
+
+.portal-ring::before {
+  content: '';
+  position: absolute;
+  top: -12px;
+  left: -12px;
+  right: -12px;
+  bottom: -12px;
+  border-radius: 50%;
+  border: 4px solid transparent;
+  border-top: 4px solid rgba(100, 200, 255, 0.4);
+  border-right: 4px solid rgba(150, 100, 255, 0.3);
+  animation: portal-ring-rotate 2s linear infinite reverse;
+}
+
+.portal-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 85%;
+  height: 85%;
+  border-radius: 50%;
+  background: transparent;
+  backdrop-filter: blur(1px);
+  box-shadow: 
+    inset 0 0 100px rgba(100, 200, 255, 0.1),
+    0 0 80px rgba(100, 200, 255, 0.3);
+  border: 2px solid rgba(100, 200, 255, 0.2);
+  overflow: hidden;
+}
+
+.portal-center::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(100, 200, 255, 0.1) 0%, transparent 70%);
+  animation: portal-ring-rotate 4s linear infinite;
+}
+
+.portal-expanding {
+  animation: portal-expand 1.2s ease-out 0.8s forwards;
+}
+
+.space-traveling {
+  animation: portal-travel 2s ease-in forwards;
+  transform-style: preserve-3d;
+  perspective: 1000px;
+}
+
+/* Floating space objects container */
+.floating-objects-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* Floating animations */
+@keyframes float-asteroid {
+  0%, 100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  25% {
+    transform: translate(30px, -40px) rotate(90deg);
+  }
+  50% {
+    transform: translate(-20px, -60px) rotate(180deg);
+  }
+  75% {
+    transform: translate(-40px, -20px) rotate(270deg);
+  }
+}
+
+@keyframes float-planet {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  25% {
+    transform: translate(40px, -50px) scale(1.1);
+  }
+  50% {
+    transform: translate(-30px, -70px) scale(0.9);
+  }
+  75% {
+    transform: translate(-50px, -30px) scale(1.05);
+  }
+}
+
+@keyframes float-nebula {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.3;
+  }
+  33% {
+    transform: translate(50px, -60px) scale(1.2);
+    opacity: 0.5;
+  }
+  66% {
+    transform: translate(-40px, -80px) scale(0.8);
+    opacity: 0.4;
+  }
+}
+
+@keyframes float-debris {
+  0%, 100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  50% {
+    transform: translate(20px, -30px) rotate(180deg);
+  }
+}
+
+.floating-asteroid {
+  position: absolute;
+  width: var(--size);
+  height: var(--size);
+  background: linear-gradient(135deg, #666 0%, #333 100%);
+  border-radius: 20%;
+  animation: float-asteroid linear infinite;
+  box-shadow: 0 0 8px rgba(150, 150, 150, 0.4);
+}
+
+.floating-planet {
+  position: absolute;
+  width: var(--size);
+  height: var(--size);
+  border-radius: 50%;
+  background: var(--bg-color);
+  animation: float-planet linear infinite;
+  box-shadow: 0 0 30px var(--glow);
+}
+
+.floating-nebula {
+  position: absolute;
+  width: var(--size);
+  height: var(--size);
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--color) 0%, transparent 70%);
+  filter: blur(25px);
+  animation: float-nebula linear infinite;
+}
+
+.floating-debris {
+  position: absolute;
+  border-radius: 2px;
+  animation: float-debris linear infinite;
+  box-shadow: 0 0 3px rgba(150, 150, 150, 0.5);
+}
+
+/* Different space views */
+.space-view-nebula {
+  background: linear-gradient(135deg, #1a0033 0%, #330066 50%, #000428 100%);
+}
+
+.space-view-galaxy {
+  background: radial-gradient(ellipse at center, #2d1b4e 0%, #0a0e27 100%);
+}
+
+.space-view-planets {
+  background: linear-gradient(180deg, #000428 0%, #004e92 50%, #0a0e27 100%);
+}
+
+.space-view-cosmic {
+  background: linear-gradient(45deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+}
+
+.space-view-stars {
+  background: #0a0e27;
+}
