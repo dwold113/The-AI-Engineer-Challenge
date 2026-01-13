@@ -1,7 +1,17 @@
 {
-  "version": 2,
-  "routes": [
-    { "src": "/(.*)", "dest": "/api/index.py" }
+  "buildCommand": "cd frontend && npm install && npm run build",
+  "outputDirectory": "frontend/.next",
+  "installCommand": "cd frontend && npm install",
+  "framework": "nextjs",
+  "functions": {
+    "api/index.py": {
+      "runtime": "python3.12"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/index.py"
+    }
   ]
 }
-
