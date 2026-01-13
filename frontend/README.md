@@ -1,13 +1,15 @@
-# Hacker Chat Frontend
+# STELLAR_AI Frontend
 
-A Next.js-based chat interface with a hacker-style aesthetic that connects to the FastAPI backend.
+A Next.js-based chat interface with a space-themed aesthetic that connects to the FastAPI backend. Features a beautiful starry night sky background with floating space objects including asteroids, planets, and nebula clouds.
 
 ## Features
 
-- 🎨 **Hacker-style UI**: Matrix-style animated background with green terminal aesthetic
-- 💬 **Real-time Chat**: Send messages to the AI mental coach backend
-- 📊 **Progress Bar**: Animated progress indicator during API calls
+- 🌌 **Space-themed UI**: Realistic night sky background with twinkling stars and floating space objects
+- 🪐 **Floating Space Objects**: Continuously animated asteroids, planets, nebula clouds, and space debris
+- 💬 **Real-time Chat**: Send messages to the STELLAR_AI personal assistant backend
+- 📊 **Progress Bar**: Animated quantum processing indicator during API calls
 - 🎯 **Responsive Design**: Works on different screen sizes
+- 🚀 **Space Aesthetics**: Cyan and purple color scheme with space-themed messaging
 
 ## Prerequisites
 
@@ -48,9 +50,10 @@ http://localhost:3000
 ## Usage
 
 - Type your message in the text input box at the bottom
-- Press Enter or click the "SEND" button to send your message
-- Watch the progress bar animate while waiting for the AI response
-- Messages are displayed in a chat-style interface with user messages in blue and assistant responses in green
+- Press Enter or click the "LAUNCH" button to send your message
+- Watch the quantum processing progress bar animate while waiting for the AI response
+- Messages are displayed in a chat-style interface with user messages in purple and assistant responses in cyan
+- Enjoy the floating space objects (asteroids, planets, nebula clouds) in the background
 
 ## Building for Production
 

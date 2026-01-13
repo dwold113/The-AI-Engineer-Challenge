@@ -1,6 +1,6 @@
-# OpenAI Chat API Backend
+# STELLAR_AI Backend API
 
-This is a FastAPI-based backend service that provides a chat interface using OpenAI's API. The service acts as a supportive mental coach, helping users with stress, motivation, habits, and confidence.
+This is a FastAPI-based backend service that provides a chat interface using OpenAI's API. The service acts as STELLAR_AI, a personal assistant from space that specializes in answering space-related questions.
 
 ## Prerequisites
 
@@ -66,7 +66,7 @@ lsof -ti:8000 | xargs kill -9
 }
 ```
 
-The chat endpoint uses OpenAI's GPT-5 model with a supportive mental coach system prompt to provide helpful responses.
+The chat endpoint uses OpenAI's GPT-5 model with a space expert system prompt. STELLAR_AI is a subject matter expert in anything related to outer space. It focuses on answering space-related questions with short and concise responses. If asked non-space questions or nonsense/gibberish, it will redirect users to ask space-related questions. If it doesn't know the answer, it will say so.
 
 ### Root Endpoint
 - **URL**: `/`
@@ -111,7 +111,7 @@ You should receive a JSON response with the AI's reply:
 
 ```json
 {
-  "reply": "Hi! It's good to hear from you. What's on your mind today?..."
+  "reply": "As a space expert, I can tell you that..."
 }
 ```
 

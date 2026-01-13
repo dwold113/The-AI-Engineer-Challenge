@@ -464,7 +464,7 @@ export default function Home() {
         {/* Header */}
         <header className="border-b-2 border-cyan-400 bg-black bg-opacity-80 p-4 backdrop-blur-sm">
           <h1 className="glitch-text text-center text-3xl font-bold text-cyan-400">
-            &gt; NEXUS_AI.exe
+            &gt; STELLAR_AI
           </h1>
           <p className="text-center text-sm text-cyan-300">Personal Assistant from Space 🚀</p>
         </header>
@@ -474,7 +474,7 @@ export default function Home() {
           <div className="mx-auto max-w-4xl space-y-4">
             {messages.length === 0 && (
               <div className="text-center text-cyan-400">
-                <p className="text-lg">[SYSTEM] NEXUS_AI initialized...</p>
+                <p className="text-lg">[SYSTEM] STELLAR_AI initialized...</p>
                 <p className="mt-2 text-sm opacity-70">Ready to assist. Type a message to begin</p>
               </div>
             )}
@@ -496,7 +496,7 @@ export default function Home() {
             {loading && (
               <div className="mr-auto max-w-[80%] rounded border-2 border-cyan-500 bg-cyan-900 bg-opacity-30 p-4 text-cyan-200">
                 <div className="mb-1 text-xs opacity-70">[SYSTEM] Processing across quantum networks...</div>
-                <div className="text-sm">Awaiting response from NEXUS_AI...</div>
+                <div className="text-sm">Awaiting response from STELLAR_AI...</div>
               </div>
             )}
             <div ref={messagesEndRef} />
