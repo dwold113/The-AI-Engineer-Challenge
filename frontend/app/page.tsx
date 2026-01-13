@@ -420,7 +420,11 @@ export default function Home() {
     setLoading(true)
 
     try {
-      const response = await fetch('http://localhost:8000/api/chat', {
+      // Use localhost only when actually on localhost, otherwise use current origin (Vercel)
+      const apiUrl = typeof window !== 'undefined' && window.location.hostname === 'localhost'
+        ? 'http://localhost:8000'
+        : ''
+      const response = await fetch(`${apiUrl}/api/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
