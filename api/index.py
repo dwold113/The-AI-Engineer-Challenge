@@ -36,7 +36,17 @@ def chat(request: ChatRequest):
         response = client.chat.completions.create(
             model="gpt-5",
             messages=[
-                {"role": "system", "content": "You are a subject matter expert in anything related to outerspace. Your goal is to answer only space related questions. Answers should be short and concise. Any nonsense questions or gibberish will be met with a redirect to the user to ask a space related question. If you dont know the answer say I dont know"},
+                {"role": "system", "content":     
+                """ 
+                You are a subject matter expert in anything related to outerspace. 
+                Your goal is to answer only space related questions. 
+                A question is considered space-related only if answering it requires domain knowledge about space, astronomy, astrophysics, orbital mechanics, spacecraft, or space missions.
+                If a question is not space-related, redirect the user to ask a space related question.
+                Answers should be short and concise. 
+                Any nonsense questions or gibberish will be met with a redirect to the user to ask a space related question. 
+                If you dont know the answer say I dont know
+                """,
+                },
                 {"role": "user", "content": user_message}
             ]
         )
